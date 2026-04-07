@@ -289,15 +289,34 @@
             dibujar() { ctx.font = "32px serif"; ctx.fillText(this.icon, this.x, this.y + 25); }
         }
 
-        class Poder {
-            constructor() {
-                this.x = canvas.width; this.y = 60 + Math.random()*60;
-                const tipos = [{i:"🧴", e:"glow"}, {i:"✨", e:"puntos"}, {i:"☂️", e:"escudo"}];
-                this.tipo = tipos[Math.floor(Math.random()*tipos.length)];
-                this.w = 25; this.h = 25;
-            }
-            dibujar() { ctx.font = "22px serif"; ctx.fillText(this.tipo.i, this.x, this.y + 20); }
+       // --- BUSCÁ ESTA CLASE EN TU SCRIPT ---
+class Poder {
+    constructor() {
+        this.x = canvas.width; this.y = 60 + Math.random()*60;
+        const tipos = [{i:"🧴", e:"glow"}, {i:"✨", e:"puntos"}, {i:"☂️", e:"escudo"}];
+        this.tipo = tipos[Math.floor(Math.random()*tipos.length)];
+        this.w = 25; this.h = 25;
+    }
+
+    // --- REEMPLAZÁ SOLO ESTA FUNCIÓN DIBUJAR() ---
+    dibujar() { 
+        ctx.save(); // Guardamos el estado del canvas
+        ctx.font = "22px serif"; 
+        ctx.textAlign = "center"; // Centramos el dibujo para que el borde quede parejo
+        
+        // Si es el paraguas, le dibujamos un contorno blanco para que resalte
+        if (this.tipo.i === "☂️") {
+            ctx.strokeStyle = "white"; // Color del borde
+            ctx.lineWidth = 3;         // Grosor del borde
+            ctx.strokeText(this.tipo.i, this.x + 12, this.y + 20); // Dibujamos el borde
         }
+        
+        // Dibujamos el emoji normal arriba (esto aplica para todos los poderes)
+        ctx.fillText(this.tipo.i, this.x + 12, this.y + 20); 
+        
+        ctx.restore(); // Restauramos el estado del canvas
+    }
+}
 
         function loop() {
             if (!juegoActivo) return;
