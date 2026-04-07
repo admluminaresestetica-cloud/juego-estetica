@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Luminares - Glow City</title>
+<style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        
+        body { font-family: 'Segoe UI', sans-serif; background: #fff5f7; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; touch-action: none; }
+        
+        #contenedor-juego { background: white; padding: 15px; border-radius: 24px; box-shadow: 0 15px 35px rgba(219, 39, 119, 0.15); text-align: center; width: 95%; max-width: 600px; position: relative; }
+
+        /* --- CONTROL DE VISIBILIDAD DE STATS --- */
+       /* Estado inicial: oculto */
+.stats-row, .progress-bg { 
+    visibility: hidden; 
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    color: #db2777;
+    margin-bottom: 6px;
+}
+
+/* Estado activo: se muestra cuando agregamos .jugando al contenedor */
+.jugando .stats-row, .jugando .progress-bg { 
+    visibility: visible; 
+    opacity: 1;
+}
+
+/* Estilo extra para el número del récord */
+#record-txt {
+    color: #9d174d; /* Un tono un poco más oscuro para resaltar */
+}
+
+        .stats-row { display: flex; justify-content: space-between; font-weight: bold; color: #db2777; margin-bottom: 6px; }
+        
+        .progress-bg { width: 100%; height: 10px; background: #fee2e9; border-radius: 10px; overflow: hidden; border: 1px solid #db277722; margin-bottom: 10px; }
+        
+        #barra-progreso { width: 0%; height: 100%; background: #db2777; transition: width 0.3s ease; }
+
+        canvas { background: #fff; border-radius: 12px; border-bottom: 4px solid #db2777; max-width: 100%; cursor: pointer; display: block; }
+
+        /* --- AJUSTE DE LA PANTALLA DE INICIO --- */
+        .overlay { 
+            position: absolute; 
+            /* Bajamos el inicio para que no tape el título principal */
+            top: 70px; 
+            left: 15px; 
+            right: 15px;
+            bottom: 15px;
+            background: rgba(255, 255, 255, 0.96); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 10; 
+            border-radius: 12px; 
+            padding: 10px;
+            gap: 10px;
+        }
+
+        /* --- ESTILOS DE ICONOS (LO QUE HABLAMOS ANTES) --- */
+        .instrucciones { background: #fff0f3; padding: 10px; border-radius: 12px; width: 95%; }
+        
+        .fila-iconos { display: flex; justify-content: center; gap: 15px; margin-top: 5px; }
+        
+        .icono-item { display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; color: #6b7280; font-weight: bold; }
+        
+        .icono-item span { font-size: 1.5rem; margin-bottom: 2px; }
+
+        .btn-inicio { background: #db2777; color: white; border: none; padding: 12px 30px; border-radius: 50px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 5px; }
+
+        .oculto { display: none !important; }
+    
+        /* --- ESTILO DE PANTALLA INICIO (OVERLAY) --- */
+        .overlay { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            background: rgba(255, 255, 255, 0.95); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 10; 
+            border-radius: 12px; 
+            padding: 15px;
+            gap: 12px; /* <-- Esto separa el título, el cuadro y el botón automáticamente */
+        }
+
+        /* --- ESTILO DEL CUADRO DE INSTRUCCIONES --- */
+        .instrucciones {
+            background: #fff0f3;
+            padding: 10px 15px;
+            border-radius: 12px;
+            font-size: 0.75rem; /* Letra un poquito más chica */
+            color: #4b5563;
+            width: 90%;
+            max-width: 350px;
+        }
+
+        /* Nueva clase para organizar los iconos en dos columnas */
+        .fila-iconos {
+            display: flex;
+            justify-content: center; /* Centra los iconos */
+            align-items: center;
+            gap: 15px; /* Espacio parejo entre cada uno */
+            margin: 5px 0 12px 0;
+            flex-wrap: wrap; /* Por si la pantalla es muy chica, se acomodan solos */
+        }
+
+        .icono-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.7rem;
+            color: #6b7280;
+        }
+
+        .icono-item span {
+            font-size: 1.4rem; /* El emoji un poco más grande */
+            margin-bottom: 2px;
+        }
+        .btn-inicio { 
+            background: #db2777; 
+            color: white; 
+            border: none; 
+            padding: 12px 30px; 
+            border-radius: 50px; 
+            font-size: 1rem; 
+            font-weight: bold; 
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(219, 39, 119, 0.2);
+        }
+
+        .oculto { display: none !important; }
+
+        @keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+.shake-efecto {
+    animation: shake 0.4s;
+}
+    </style>
+</head>
+<body>
+<div id="contenedor-juego">
+    <h2 style="color: #db2777; margin-bottom: 10px;">✨ Luminares Glow ✨</h2>
+    
+    <div class="stats-row">
+    <span>Puntos: <span id="puntos">0</span></span>
+    <span>🏆 Récord: <span id="record-txt">0</span></span>
+    <span>Piel: <span id="glow-level">Normal</span></span>
+</div>
+    
+    <div class="progress-bg" style="margin-bottom: 10px;">
+        <div id="barra-progreso"></div>
+    </div>
+
+    <div style="position: relative;">
+        <canvas id="gameCanvas" width="600" height="200"></canvas>
+        
+        <div id="pantalla-inicio" class="overlay">
+            <button class="btn-info" onclick="abrirModal()" style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #db2777; color: #db2777; border-radius: 50%; width: 30px; height: 30px; font-weight: bold; cursor: pointer;">?</button>
+            
+            <div style="text-align: center;">
+                <h3 style="color: #db2777; margin-bottom: 5px;">¡Bienvenida!</h3>
+                <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 15px;">Esquivá el daño, resaltá tu brillo.</p>
+                
+                <p style="font-weight: bold; color: #db2777; margin-bottom: 15px; font-size: 0.9rem;">Objetivo: 1500 puntos 🎁</p>
+                
+                <button class="btn-inicio" onclick="iniciarPartida()">¡EMPEZAR!</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-guia" class="modal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.95); z-index: 100; border-radius: 24px; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+        <div style="background: white; padding: 20px; border-radius: 20px; width: 85%; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative;">
+            <span onclick="cerrarModal()" style="position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #9ca3af;">&times;</span>
+            
+            <h4 style="color: #db2777; margin-bottom: 15px;">Guía de Juego</h4>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left;">
+                <div style="font-size: 0.75rem;">
+                    <p style="font-weight: bold; color: #e11d48;">🚫 EVITAR</p>
+                    <div>☀️ Sol</div>
+                    <div>🪨 Roca</div>
+                    <div>🌪️ Viento</div>
+                    <div>☁️ Nube</div>
+                </div>
+                <div style="font-size: 0.75rem;">
+                    <p style="font-weight: bold; color: #059669;">💖 USAR</p>
+                    <div>🧴 Sérum</div>
+                    <div>✨ Glow</div>
+                    <div>☂️ Escudo</div>
+                </div>
+            </div>
+            
+            <p style="font-size: 0.8rem; color: #6b7280; margin-top: 15px; border-top: 1px solid #eee; pt: 10px;">
+                Los <b>Sérums</b> dan muchos puntos. El <b>Glow</b> te hace brillar.
+            </p>
+        </div>
+    </div>
+    <div id="pantalla-victoria" class="modal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 150; border-radius: 24px; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+        <div style="background: white; padding: 30px; border-radius: 24px; text-align: center; box-shadow: 0 15px 45px rgba(219, 39, 119, 0.3); border: 3px solid #db2777; width: 85%;">
+            <h2 style="color: #db2777; margin-bottom: 10px;">¡PIEL RADIANTE! ✨</h2>
+            <p style="color: #4b5563; margin-bottom: 20px; font-size: 0.9rem;">Lograste el Glow perfecto con Luminares.</p>
+            
+            <div style="background: #fff5f7; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px dashed #db2777;">
+                <p style="font-size: 0.7rem; color: #db2777; font-weight: bold; margin-bottom: 5px;">TU RECOMPENSA:</p>
+                <p style="font-size: 1.2rem; font-weight: bold; color: #111;">GLOW15</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button onclick="continuarJugando()" class="btn-inicio" style="padding: 12px;">SEGUIR POR EL RÉCORD 🏆</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const puntosTxt = document.getElementById('puntos');
+        const glowTxt = document.getElementById('glow-level');
+        const barraProgreso = document.getElementById('barra-progreso');
+        const pantallaInicio = document.getElementById('pantalla-inicio');
+
+        let puntos = 0, juegoActivo = false, frames = 0, velocidadJuego = 5;
+        let obstaculos = [], poderes = [], particulas = [], ciudad = [];
+        let flashFondo = 0; // Para el efecto de destello
+        const UMBRAL = 1500;
+        let victoriaAlcanzada = false;
+        let record = localStorage.getItem('glow_record') || 0;
+        document.getElementById('record-txt').innerText = record;
+
+        // Crear ciudad de fondo (Casitas y Árboles)
+        for(let i=0; i<10; i++) {
+            ciudad.push({
+                x: i * 120,
+                w: 40 + Math.random() * 60,
+                h: 30 + Math.random() * 50,
+                tipo: Math.random() > 0.5 ? 'casa' : 'arbol'
+            });
+        }
+
+const silueta = {
+            x: 50,
+            y: 155,
+            w: 18,
+            h: 40,
+            dy: 0,
+            gravedad: 0.6,
+            salto: -12.5,
+            tieneEscudo: false,
+            brillo: 0,
+            estela: [],
+
+            saltar() {
+                if (this.y >= canvas.height - this.h - 2) { 
+                    this.dy = this.salto;
+                }
+            },
+
+            actualizar() {
+                this.dy += this.gravedad;
+                this.y += this.dy;
+                if (this.y + this.h > canvas.height) {
+                    this.y = canvas.height - this.h;
+                    this.dy = 0;
+                }
+                if (this.brillo > 0) this.brillo -= 0.15;
+            },
+
+           dibujar() {
+            // 1. GESTIÓN DEL RASTRO (Guardamos la posición actual)
+            if (!this.estela) this.estela = []; // Por si las dudas no se inicializó
+            this.estela.unshift({ x: this.x, y: this.y });
+            if (this.estela.length > 6) this.estela.pop();
+
+            // 2. DIBUJAR LAS SOMBRAS (Se dibujan antes que el cuerpo para que queden atrás)
+            this.estela.forEach((pos, index) => {
+                if (index === 0) return; 
+                ctx.save();
+                ctx.globalAlpha = 0.2 / index; 
+                ctx.fillStyle = "#fb7185"; 
+                this.dibujarForma(ctx, pos.x, pos.y, this.w, this.h, 10);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 3. TU CÓDIGO ORIGINAL (Con el brillo y efectos)
+            const bx = this.x;
+            const by = this.y;
+            const mov = Math.sin(frames * 0.2); 
+            
+            ctx.save();
+            
+            if (this.brillo > 5) {
+                ctx.shadowBlur = this.brillo;
+                ctx.shadowColor = this.brillo > 15 ? "#fbbf24" : "#db2777"; 
+            }
+
+                // 1. MIEMBROS DEL LADO "LEJANO" (Se dibujan primero para que queden atrás)
+                ctx.strokeStyle = "#be185d"; // Rosa más oscuro (sombra)
+                ctx.lineWidth = 3;
+                const brazoY = by + 16;
+                const piernaY = by + 30;
+
+                if (this.y < canvas.height - this.h - 2) {
+                    // Salto (atrás)
+                    ctx.beginPath(); ctx.moveTo(bx + 9, brazoY); ctx.lineTo(bx - 2, brazoY + 5); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(bx + 9, piernaY); ctx.lineTo(bx - 1, by + this.h); ctx.stroke();
+                } else {
+                    // Carrera (atrás) - Movimiento invertido al delantero
+                    ctx.beginPath(); ctx.moveTo(bx + 9, brazoY); ctx.lineTo(bx + 9 - mov * 7, brazoY + 10); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(bx + 9, piernaY); ctx.lineTo(bx + 9 + mov * 6, by + this.h + 2); ctx.stroke();
+                }
+
+                // 2. CUERPO Y CABEZA
+                ctx.fillStyle = "#ffceda";
+                ctx.beginPath();
+                ctx.arc(bx + this.w/2 + 2, by + 6, 6, 0, Math.PI * 2); // Cabeza movida un pelín a la derecha
+                ctx.fill();
+                
+                ctx.fillStyle = "#db2777";
+                this.dibujarForma(ctx, bx + 5, by + 3, this.w - 6, 6, 3); // Visor hacia la derecha
+                ctx.fill();
+                
+                ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+                ctx.beginPath();
+                ctx.ellipse(bx + this.w * 0.8, by + 4, 1.5, 3, -0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "#ffe4eb";
+                this.dibujarForma(ctx, bx, by + 12, this.w, 18, 5);
+                ctx.fill();
+
+                // 3. MIEMBROS DEL LADO "CERCANO" (Se dibujan al final para que queden adelante)
+                ctx.strokeStyle = "#db2777";
+                ctx.lineWidth = 3.5;
+                
+                if (this.y < canvas.height - this.h - 2) {
+                    // Salto (adelante)
+                    ctx.beginPath(); ctx.moveTo(bx + 9, brazoY); ctx.lineTo(bx + 18, brazoY + 5); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(bx + 9, piernaY); ctx.lineTo(bx + 16, by + this.h); ctx.stroke();
+                } else {
+                    // Carrera (adelante)
+                    ctx.beginPath(); ctx.moveTo(bx + 9, brazoY); ctx.lineTo(bx + 9 + mov * 7, brazoY + 10); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(bx + 9, piernaY); ctx.lineTo(bx + 9 - mov * 6, by + this.h + 2); ctx.stroke();
+                }
+
+                if (this.tieneEscudo) {
+                // 1. Efecto de pulsación rítmica
+                const pulsacion = Math.sin(frames * 0.1) * 3;
+                const radioDinamico = 30 + pulsacion;
+
+                // 2. Gradiente radial para el aura
+                const gradiente = ctx.createRadialGradient(
+                    bx + this.w/2, by + this.h/2, 0,
+                    bx + this.w/2, by + this.h/2, radioDinamico
+                );
+
+                gradiente.addColorStop(0, 'rgba(251, 113, 133, 0)');    // Centro invisible
+                gradiente.addColorStop(0.6, 'rgba(251, 113, 133, 0.2)'); // Brillo tenue
+                gradiente.addColorStop(1, 'rgba(251, 113, 133, 0.7)');   // Borde definido
+
+                ctx.fillStyle = gradiente;
+                ctx.beginPath();
+                ctx.arc(bx + this.w/2, by + this.h/2, radioDinamico, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 3. Trazo exterior con brillo (Glow)
+                ctx.strokeStyle = "#fb7185";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]); // Quitamos las rayitas para que sea una línea sólida de luz
+                
+                ctx.shadowColor = "#fb7185";
+                ctx.shadowBlur = 12; // Este es el efecto de neón
+                
+                ctx.stroke();
+                
+                // Limpiamos la sombra para que no afecte a otros dibujos
+                ctx.shadowBlur = 0;
+            }
+
+            ctx.restore();
+            },
+
+            dibujarForma(ctx, x, y, w, h, r) {
+                ctx.beginPath();
+                ctx.moveTo(x + r, y);
+                ctx.arcTo(x + w, y, x + w, y + h, r);
+                ctx.arcTo(x + w, y + h, x, y + h, r);
+                ctx.arcTo(x, y + h, x, y, r);
+                ctx.arcTo(x, y, x + w, y, r);
+                ctx.closePath();
+            }
+        };
+
+        function dibujarFondo() {
+            // Fondo base (reacciona al Flash)
+            let baseColor = flashFondo > 0 ? `rgba(251, 191, 36, ${flashFondo})` : "#fff5f7";
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (flashFondo > 0) flashFondo -= 0.05;
+
+            // Dibujar Ciudad (Parallax)
+            ctx.fillStyle = "#fce7f3"; // Rosa muy suave para las casas
+            ciudad.forEach(obj => {
+                obj.x -= velocidadJuego * 0.3; // Se mueve más lento
+                if (obj.x + obj.w < 0) obj.x = canvas.width + 50;
+                
+                if (obj.tipo === 'casa') {
+                    ctx.fillRect(obj.x, canvas.height - obj.h - 2, obj.w, obj.h);
+                    // Techito
+                    ctx.beginPath(); ctx.moveTo(obj.x, canvas.height-obj.h-2); ctx.lineTo(obj.x+obj.w/2, canvas.height-obj.h-15); ctx.lineTo(obj.x+obj.w, canvas.height-obj.h-2); ctx.fill();
+                } else {
+                    ctx.beginPath(); ctx.arc(obj.x + 10, canvas.height - 25, 15, 0, Math.PI*2); ctx.fill(); // Arbolito
+                    ctx.fillRect(obj.x + 8, canvas.height - 15, 4, 15); // Tronco
+                }
+            });
+            // Suelo
+            ctx.strokeStyle = "#db277733"; ctx.beginPath(); ctx.moveTo(0, 198); ctx.lineTo(600, 198); ctx.stroke();
+        }
+
+class Obstaculo {
+    constructor() {
+        this.x = canvas.width;
+        
+        // Ahora con 4 variantes para más diversión
+        const tipos = [
+            {i: "☀️", y: 165}, // Sol (Nivel medio)
+            {i: "🪨", y: 175}, // Roca (Suelo)
+            {i: "🌪️", y: 170}, // Tornado (Suelo)
+            {i: "☁️", y: 100}  // Nube (Alta - ¡No saltar aquí!)
+        ];
+        
+        const t = tipos[Math.floor(Math.random() * tipos.length)];
+        this.icon = t.i; 
+        this.y = t.y; 
+        this.w = 30; 
+        this.h = 30;
+    }
+
+    dibujar() {
+        ctx.save();
+        // Sombra sutil para que resalten sobre las casitas rosas
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = "rgba(0,0,0,0.2)";
+        ctx.shadowOffsetY = 3;
+        
+        ctx.font = "32px serif"; 
+        ctx.fillText(this.icon, this.x, this.y + 25);
+        ctx.restore();
+    }
+}
+        class Poder {
+            constructor() {
+                this.x = canvas.width; this.y = 60 + Math.random()*60;
+                const tipos = [{i:"🧴", e:"glow", c:"#fbbf24"}, {i:"✨", e:"puntos", c:"#db2777"}, {i:"☂️", e:"escudo", c:"#06b6d4"}];
+                this.tipo = tipos[Math.floor(Math.random()*tipos.length)];
+                this.w = 25; this.h = 25;
+            }
+            dibujar() { ctx.font = "22px serif"; ctx.fillText(this.tipo.i, this.x, this.y + 20); }
+        }
+
+function loop() {
+            if (!juegoActivo) return;
+            dibujarFondo();
+
+            // Obstáculos y Poderes
+            if (frames % 100 === 0) obstaculos.push(new Obstaculo());
+            if (frames % 180 === 0) poderes.push(new Poder());
+
+            
+obstaculos.forEach((ob, i) => {
+                ob.x -= velocidadJuego; ob.dibujar();
+                if (silueta.x < ob.x+ob.w && silueta.x+silueta.w > ob.x && silueta.y < ob.y+ob.h && silueta.y+silueta.h > ob.y) {
+                    if (silueta.tieneEscudo) { 
+                        silueta.tieneEscudo = false; 
+                        obstaculos.splice(i, 1); 
+                        // sonar('punto'); // OPCIONAL: Podés poner un sonido de "escudo roto"
+                    } else {
+                        
+                        sonar('golpe');
+                        
+                        gameOver();
+                    }
+                }
+                if (ob.x < -30) obstaculos.splice(i, 1);
+            });
+
+           poderes.forEach((p, i) => {
+                p.x -= velocidadJuego; p.dibujar();
+                if (silueta.x < p.x+p.w && silueta.x+silueta.w > p.x && silueta.y < p.y+p.h && silueta.y+silueta.h > p.y) {
+                    
+                    sonar('punto'); // <--- ¡LISTO! Ahora ya no es un comentario, es una orden.
+                    
+                    if (p.tipo.e === "glow") { silueta.brillo = 35; flashFondo = 0.4; } 
+                    else if (p.tipo.e === "escudo") silueta.tieneEscudo = true;
+                    puntos += 50; poderes.splice(i, 1);
+                }
+                if (p.x < -30) poderes.splice(i, 1);
+            });
+
+           silueta.actualizar();
+            silueta.dibujar();
+
+            // === NUEVO: LÓGICA DE PARTÍCULAS AL CAMINAR ===
+            // Chequeamos si la silueta está en el suelo (ajustado a 100px del borde inferior)
+            if (silueta.y >= canvas.height - 100 - silueta.h) {
+                if (frames % 5 === 0) { 
+                    particulasCaminar.push(new ParticulaCaminar(silueta.x, silueta.y + silueta.h));
+                }
+            }
+
+            // Dibujar y limpiar partículas de la lista
+            particulasCaminar.forEach((p, i) => {
+                p.actualizar();
+                p.dibujar();
+                if (p.alpha <= 0) particulasCaminar.splice(i, 1);
+            });
+            // ==============================================
+
+            frames++; 
+            if (frames % 10 === 0) puntos++;
+            if (frames % 600 === 0) velocidadJuego += 0.5;
+            
+            puntosTxt.innerText = puntos;
+
+            // === ACTUALIZACIÓN DEL RÉCORD ===
+            if (puntos > record) {
+                record = puntos;
+                localStorage.setItem('glow_record', record);
+                const recordDisplay = document.getElementById('record-txt');
+                if (recordDisplay) recordDisplay.innerText = record;
+            }
+
+            // === CHEQUEO DE VICTORIA ===
+            if (puntos >= UMBRAL && !victoriaAlcanzada) {
+                victoriaAlcanzada = true;
+                mostrarVictoria();
+            }
+
+            barraProgreso.style.width = Math.min((puntos/UMBRAL)*100, 100) + "%";
+            glowTxt.innerText = silueta.brillo > 15 ? "¡RADIANTE! ✨" : "Normal";
+            
+            requestAnimationFrame(loop);
+        }
+        
+class ParticulaCaminar {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 4 + 1;
+        this.speedX = Math.random() * -2 - 1; // Salen hacia atrás
+        this.speedY = Math.random() * -1;      // Un poquito hacia arriba
+        this.color = "#fb7185";
+        this.alpha = 1;
+    }
+    actualizar() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.alpha -= 0.05; // Se van desvaneciendo
+    }
+    dibujar() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+// Necesitamos una lista para guardarlas (ponela con tus otras variables)
+let particulasCaminar = [];
+
+function iniciarPartida() {
+            // Esta línea activa la visibilidad de los puntos y la barra
+            document.getElementById('contenedor-juego').classList.add('jugando');
+
+            puntos = 0; 
+            frames = 0; 
+            velocidadJuego = 5; 
+            obstaculos = []; 
+            poderes = []; 
+            
+            // === RESETEAMOS LA VICTORIA AQUÍ ===
+            victoriaAlcanzada = false; 
+            // ===================================
+
+            silueta.y = 150; 
+            silueta.brillo = 0; 
+            silueta.tieneEscudo = false;
+            
+            juegoActivo = true; 
+            pantallaInicio.classList.add('oculto');
+            
+            requestAnimationFrame(loop);
+        }
+
+function gameOver() {
+    // 1. ACTIVAR TEMBLOR (NUEVO)
+    canvas.classList.add('shake-efecto');
+    
+    // 2. SONIDO DE GOLPE (OPCIONAL SI YA PUSISTE LA FUNCIÓN SONAR)
+    // sonar('golpe');
+
+    juegoActivo = false;
+
+    // 3. RETRASO PARA QUE SE VEA EL CHOQUE (NUEVO)
+    setTimeout(() => {
+        canvas.classList.remove('shake-efecto'); // Limpiamos la clase
+        pantallaInicio.classList.remove('oculto');
+
+        // Estilizamos el contenido del mensaje (Lo que ya tenías)
+        if (puntos >= UMBRAL) {
+            // MENSAJE DE VICTORIA
+            pantallaInicio.innerHTML = `
+                <h2 style="color: #db2777; margin-bottom: 5px;">¡OBJETIVO LOGRADO! ✨</h2>
+                <p style="font-size: 1.1rem; font-weight: bold;">Puntaje: ${puntos}</p>
+                <p style="font-size: 0.9rem; color: #4b5563; margin: 10px 0;">¡Sos una experta en Glow!</p>
+                <button class="btn-inicio" onclick="location.reload()">RECLAMAR PREMIO</button>
+                <a href="javascript:location.reload()" style="color: #9ca3af; font-size: 0.8rem; text-decoration: none; margin-top: 15px; display: block;">Volver al inicio</a>
+            `;
+        } else {
+            // MENSAJE DE DERROTA
+            pantallaInicio.innerHTML = `
+                <h2 style="color: #6b7280; margin-bottom: 1px;">¡Casi lo lográs! ☀️</h2>
+                <p style="font-size: 1.1rem; font-weight: bold;">Puntaje: ${puntos}</p>
+                <p style="font-size: 0.85rem; color: #ef4444; margin-bottom: 15px;">Te faltaron ${UMBRAL - puntos} puntos para el premio.</p>
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; align-items: center;">
+                    <button class="btn-inicio" onclick="iniciarPartida()">REINTENTAR</button>
+                    <button onclick="location.reload()" 
+                        style="background: none; border: 1px solid #d1d5db; color: #9ca3af; padding: 4px 10px; border-radius: 50px; font-weight: 500; cursor: pointer; width: 120px; font-size: 0.65rem; text-transform: uppercase; margin-top: 5px;">
+                        Volver al inicio
+                    </button>
+                </div>
+            `;
+        }
+    }, 400); // El mensaje aparece después de 400ms (lo que dura el temblor)
+}
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); if(juegoActivo) silueta.saltar(); }, {passive: false});
+        window.addEventListener('keydown', (e) => { if(e.code === 'Space') { if(juegoActivo) silueta.saltar(); else iniciarPartida(); }});
+    function abrirModal() {
+    document.getElementById('modal-guia').style.display = 'flex';
+}
+
+function cerrarModal() {
+    document.getElementById('modal-guia').style.display = 'none';
+}
+
+// Esta función se ejecuta apenas llegás al puntaje meta
+        function mostrarVictoria() {
+            juegoActivo = false; // Pausamos el movimiento
+            document.getElementById('pantalla-victoria').style.display = 'flex';
+            
+            // Opcional: un desenfoque para que se vea más profesional
+            document.getElementById('gameCanvas').style.filter = 'blur(3px)';
+        }
+
+        // Esta función se ejecuta cuando tocás el botón "SEGUIR POR EL RÉCORD"
+        function continuarJugando() {
+            // 1. Escondemos el cartel
+            document.getElementById('pantalla-victoria').style.display = 'none';
+            
+            // 2. Quitamos el desenfoque
+            document.getElementById('gameCanvas').style.filter = 'none';
+            
+            // 3. Reactivamos el juego y el bucle
+            juegoActivo = true; 
+            requestAnimationFrame(loop); 
+        }
+
+function sonar(tipo) {
+    // Creamos el contexto de audio
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (tipo === 'punto') { 
+        // Sonido agudo y ascendente (agarrar ítem)
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    } 
+    else if (tipo === 'golpe') { 
+        // Sonido grave y ruidoso (choque)
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    }
+
+    osc.start();
+    // Hace que el sonido desaparezca suavemente
+    gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2);
+    osc.stop(audioCtx.currentTime + 0.2);
+}
+
+    </script>
+</body>
+</html>
