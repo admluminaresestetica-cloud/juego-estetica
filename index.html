@@ -290,33 +290,22 @@
         }
 
        // --- BUSCÁ ESTA CLASE EN TU SCRIPT ---
-class Poder {
-    constructor() {
-        this.x = canvas.width; this.y = 60 + Math.random()*60;
-        const tipos = [{i:"🧴", e:"glow"}, {i:"✨", e:"puntos"}, {i:"☂️", e:"escudo"}];
-        this.tipo = tipos[Math.floor(Math.random()*tipos.length)];
-        this.w = 25; this.h = 25;
-    }
-
-    // --- REEMPLAZÁ SOLO ESTA FUNCIÓN DIBUJAR() ---
-    dibujar() { 
-        ctx.save(); // Guardamos el estado del canvas
+dibujar() { 
+        ctx.save();
         ctx.font = "22px serif"; 
-        ctx.textAlign = "center"; // Centramos el dibujo para que el borde quede parejo
+        ctx.textAlign = "center";
         
-        // Si es el paraguas, le dibujamos un contorno blanco para que resalte
+        // Si es el paraguas, aplicamos el borde oscuro
         if (this.tipo.i === "☂️") {
-            ctx.strokeStyle = "white"; // Color del borde
-            ctx.lineWidth = 3;         // Grosor del borde
-            ctx.strokeText(this.tipo.i, this.x + 12, this.y + 20); // Dibujamos el borde
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.8)"; // Negro con un toque de transparencia para que no sea tan brusco
+            ctx.lineWidth = 2; // Un borde de 2px es suficiente para definir la silueta
+            ctx.strokeText(this.tipo.i, this.x + 12, this.y + 20);
         }
         
-        // Dibujamos el emoji normal arriba (esto aplica para todos los poderes)
+        // Dibujamos el emoji
         ctx.fillText(this.tipo.i, this.x + 12, this.y + 20); 
-        
-        ctx.restore(); // Restauramos el estado del canvas
+        ctx.restore();
     }
-}
 
         function loop() {
             if (!juegoActivo) return;
