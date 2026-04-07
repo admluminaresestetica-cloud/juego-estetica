@@ -41,7 +41,20 @@
         
         #barra-progreso { width: 0%; height: 100%; background: #db2777; transition: width 0.3s ease; }
 
-        canvas { background: #fff; border-radius: 12px; border-bottom: 4px solid #db2777; max-width: 100%; cursor: pointer; display: block; }
+        canvas { 
+    background: #fff; 
+    border-radius: 12px; 
+    border-bottom: 4px solid #db2777; 
+    cursor: pointer; 
+    display: block; 
+    margin: 0 auto; /* Esto lo centra en la pantalla */
+
+    /* EL TRUCO PARA EL CELULAR */
+    width: 100%;    /* Obliga al canvas a ocupar todo el ancho disponible */
+    height: auto;   /* Mantiene la proporción para que no se vea "flaco" o "gordo" */
+    max-width: 800px; /* Poné acá el ancho original de tu juego para que en PC no se vea gigante */
+}
+
 
         /* --- AJUSTE DE LA PANTALLA DE INICIO --- */
         .overlay { 
