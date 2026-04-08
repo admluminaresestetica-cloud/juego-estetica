@@ -385,10 +385,19 @@ class Poder {
         function loop() {
             if (!juegoActivo) return;
             dibujarFondo();
+
+            // --- OPTIMIZACIÓN PARA CELULAR: LIMPIEZA DE MEMORIA ---
+            // Cada 60 frames (1 segundo aprox) barremos lo que quedó fuera
+            if (frames % 60 === 0) {
+                obstaculos = obstaculos.filter(ob => ob.x > -50);
+                poderes = poderes.filter(p => p.x > -50);
+                particulasCaminar = particulasCaminar.filter(p => p.alpha > 0);
+            }
+
             if (frames % 100 === 0) obstaculos.push(new Obstaculo());
             if (frames % 180 === 0) poderes.push(new Poder());
 
-            /* LÓGICA DE MOVIMIENTO INDEPENDIENTE: El mundo siempre se mueve */
+            /* LÓGICA DE MOVIMIENTO INDEPENDIENTE */
             obstaculos.forEach((ob, i) => {
                 ob.x -= velocidadJuego; 
                 ob.dibujar();
@@ -414,12 +423,14 @@ class Poder {
             silueta.actualizar();
             silueta.dibujar();
 
+            // CREACIÓN DE PARTÍCULAS (Solo 1 cada 5 frames para no saturar)
             if (silueta.y >= canvas.height - silueta.h - 5 && frames % 5 === 0) {
                 particulasCaminar.push(new ParticulaCaminar(silueta.x, silueta.y + silueta.h));
             }
 
             particulasCaminar.forEach((p, i) => {
-                p.actualizar(); p.dibujar();
+                p.actualizar(); 
+                p.dibujar();
                 if (p.alpha <= 0) particulasCaminar.splice(i, 1);
             });
 
@@ -441,14 +452,36 @@ class Poder {
         }
         
         class ParticulaCaminar {
-            constructor(x, y) { this.x = x; this.y = y; this.size = Math.random() * 4 + 1; this.speedX = -2; this.speedY = -1; this.alpha = 1; }
-            actualizar() { this.x += this.speedX; this.y += this.speedY; this.alpha -= 0.05; }
-            dibujar() { ctx.save(); ctx.globalAlpha = this.alpha; ctx.fillStyle = "#fb7185"; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+            constructor(x, y) { 
+                this.x = x; 
+                this.y = y; 
+                this.size = Math.random() * 3 + 1; // Un poco más pequeñas
+                this.speedX = -2; 
+                this.speedY = -1; 
+                this.alpha = 1; 
+            }
+            actualizar() { 
+                this.x += this.speedX; 
+                this.y += this.speedY; 
+                this.alpha -= 0.08; // Mueren más rápido (antes 0.05) para liberar memoria
+            }
+            dibujar() { 
+                ctx.save(); 
+                ctx.globalAlpha = this.alpha; 
+                ctx.fillStyle = "#fb7185"; 
+                ctx.beginPath(); 
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); 
+                ctx.fill(); 
+                ctx.restore(); 
+            }
         }
 
         function iniciarPartida() {
             document.getElementById('contenedor-juego').classList.add('jugando');
-            puntos = 0; frames = 0; velocidadJuego = 5; obstaculos = []; poderes = []; 
+            // Limpieza total de arrays al empezar
+            puntos = 0; frames = 0; velocidadJuego = 5; 
+            obstaculos = []; poderes = []; particulasCaminar = []; 
+            
             victoriaAlcanzada = false; silueta.y = 150; silueta.brillo = 0; silueta.tieneEscudo = false;
             juegoActivo = true; pantallaInicio.classList.add('oculto');
             requestAnimationFrame(loop);
