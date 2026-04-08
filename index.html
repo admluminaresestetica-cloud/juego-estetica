@@ -116,6 +116,8 @@
     </style>
 </head>
 <body>
+    
+<audio id="musica-fondo" src="musica.mp3.mp3" loop></audio>
 
 <div id="cartel-rotar">
     <div class="contenido-cartel">
@@ -477,13 +479,31 @@ class Poder {
         }
 
         function iniciarPartida() {
+            // 1. OBTENER Y REPRODUCIR LA MÚSICA
+            const musica = document.getElementById('musica-fondo');
+            if (musica) {
+                musica.volume = 0.3; // Volumen al 30% para que no tape los efectos
+                musica.currentTime = 0; // Empieza desde el principio
+                musica.play().catch(e => console.log("Error al cargar música:", e));
+            }
+
             document.getElementById('contenedor-juego').classList.add('jugando');
-            // Limpieza total de arrays al empezar
-            puntos = 0; frames = 0; velocidadJuego = 5; 
-            obstaculos = []; poderes = []; particulasCaminar = []; 
             
-            victoriaAlcanzada = false; silueta.y = 150; silueta.brillo = 0; silueta.tieneEscudo = false;
-            juegoActivo = true; pantallaInicio.classList.add('oculto');
+            // Limpieza total de arrays al empezar
+            puntos = 0; 
+            frames = 0; 
+            velocidadJuego = 5; 
+            obstaculos = []; 
+            poderes = []; 
+            particulasCaminar = []; 
+            
+            victoriaAlcanzada = false; 
+            silueta.y = 150; 
+            silueta.brillo = 0; 
+            silueta.tieneEscudo = false;
+            
+            juegoActivo = true; 
+            pantallaInicio.classList.add('oculto');
             requestAnimationFrame(loop);
         }
 
