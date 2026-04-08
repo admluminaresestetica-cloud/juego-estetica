@@ -147,6 +147,7 @@
     }
 </style>
 <audio id="musica-fondo" src="musica-juegoloop.mp3" loop></audio>
+<audio id="musica-jefe" src="musica-jefe.mp3" loop></audio>
 
 <div id="contenedor-juego">
     <h2 style="color: #db2777; margin-bottom: 10px;">✨ Luminares Glow ✨</h2>
@@ -170,7 +171,7 @@
             <div style="text-align: center;">
                 <h3 style="color: #db2777; margin-bottom: 5px;">¡Bienvenida!</h3>
                 <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 15px;">Esquivá el daño, resaltá tu brillo.</p>
-                <p style="font-weight: bold; color: #db2777; margin-bottom: 15px; font-size: 0.9rem;">Objetivo: 1500 puntos 🎁</p>
+                <p style="font-weight: bold; color: #db2777; margin-bottom: 15px; font-size: 0.9rem;">Objetivo: 2000 puntos 🎁</p>
                 <button class="btn-inicio" onclick="iniciarPartida()">¡EMPEZAR!</button>
             </div>
         </div>
@@ -220,11 +221,18 @@
         const glowTxt = document.getElementById('glow-level');
         const barraProgreso = document.getElementById('barra-progreso');
         const pantallaInicio = document.getElementById('pantalla-inicio');
+        const musicaFondo = document.getElementById('musica-fondo');
+        const musicaJefe = document.getElementById('musica-jefe');
 
         let puntos = 0, juegoActivo = false, frames = 0, velocidadJuego = 5, etapaActual = "dia";
         let obstaculos = [], poderes = [], particulasCaminar = [], ciudad = []; vehiculos = [];
         let flashFondo = 0; 
-        const UMBRAL = 1500;
+        let modoJefe = false;        // Controla si el mundo está frenado para la pelea
+        let jefeDerrotado = false;   // Para que el jefe aparezca una sola vez a los 1000 pts
+        let jefeActual = null;       // Aquí guardaremos la información de la "Nube"
+        let proyectiles = [];        // Aquí guardaremos los rayitos que lances
+        let musicaJefeSonando = false;
+        const UMBRAL = 2000;
         let victoriaAlcanzada = false;
         let record = localStorage.getItem('glow_record') || 0;
         document.getElementById('record-txt').innerText = record;
@@ -419,122 +427,182 @@ class Poder {
 }
 
         function loop() {
-            if (!juegoActivo) return;
+    if (!juegoActivo) return;
 
-            // --- ACTUALIZAR LA ETAPA SEGÚN PUNTOS ---
-            if (puntos < 1000) {
-                etapaActual = "dia";
-            } else if (puntos >= 1000 && puntos < 2000) {
-                etapaActual = "tarde";
-            } else if (puntos >= 2000) {
-                etapaActual = "noche";
-            }
-            if (frames % 450 === 0 && cartelesMarca.length < 2) {
-                cartelesMarca.push(new CartelMarca());
-            }
-
-            dibujarFondo();
-
-            // --- NUEVO: APARECER VEHÍCULOS (Paso 3) ---
-            // Aparece un vehículo cada 250 frames si hay menos de 3 en pantalla
-            if (frames % 250 === 0 && vehiculos.length < 3) {
-                vehiculos.push(new Vehiculo());
-            }
-
-            // --- NUEVO: DIBUJAR VEHÍCULOS ---
-            // Se dibujan aquí para que queden detrás de la silueta y los obstáculos
-            vehiculos.forEach((v, i) => {
-                v.actualizar();
-                v.dibujar();
-                if (v.x < -100) vehiculos.splice(i, 1);
-            });
-            
-            cartelesMarca.forEach((c, i) => {
-                c.actualizar();
-                c.dibujar();
-                if (c.x < -150) cartelesMarca.splice(i, 1);
-            });
-
-            // --- OPTIMIZACIÓN: LIMPIEZA DE MEMORIA ---
-            if (frames % 60 === 0) {
-                obstaculos = obstaculos.filter(ob => ob.x > -50);
-                poderes = poderes.filter(p => p.x > -50);
-                particulasCaminar = particulasCaminar.filter(p => p.alpha > 0);
-                vehiculos = vehiculos.filter(v => v.x > -100); // También limpiamos vehículos
-            }
-
-            if (frames % 100 === 0) obstaculos.push(new Obstaculo());
-            if (frames % 180 === 0) poderes.push(new Poder());
-
-            /* LÓGICA DE MOVIMIENTO INDEPENDIENTE (Obstáculos) */
-            obstaculos.forEach((ob, i) => {
-                ob.x -= velocidadJuego; 
-                ob.dibujar();
-                if (silueta.x < ob.x+ob.w && silueta.x+silueta.w > ob.x && silueta.y < ob.y+ob.h && silueta.y+silueta.h > ob.y) {
-                    if (silueta.tieneEscudo) { 
-                        silueta.tieneEscudo = false; 
-                        obstaculos.splice(i, 1); 
-                    } else { 
-                        sonar('golpe'); 
-                        gameOver(); 
-                    }
-                }
-                if (ob.x < -30) obstaculos.splice(i, 1);
-            });
-
-            /* LÓGICA DE PODERES */
-            poderes.forEach((p, i) => {
-                p.x -= velocidadJuego; 
-                p.dibujar();
-                if (silueta.x < p.x+p.w && silueta.x+silueta.w > p.x && silueta.y < p.y+p.h && silueta.y+silueta.h > p.y) {
-                    sonar('punto');
-                    if (p.tipo.e === "glow") { 
-                        silueta.brillo = 35; 
-                        flashFondo = 0.4; 
-                    } else if (p.tipo.e === "escudo") {
-                        silueta.tieneEscudo = true;
-                    }
-                    puntos += 50; 
-                    poderes.splice(i, 1);
-                }
-                if (p.x < -30) poderes.splice(i, 1);
-            });
-
-            silueta.actualizar();
-            silueta.dibujar();
-
-            /* PARTÍCULAS AL CAMINAR */
-            if (silueta.y >= canvas.height - silueta.h - 5 && frames % 5 === 0) {
-                particulasCaminar.push(new ParticulaCaminar(silueta.x, silueta.y + silueta.h));
-            }
-
-            particulasCaminar.forEach((p, i) => {
-                p.actualizar(); 
-                p.dibujar();
-                if (p.alpha <= 0) particulasCaminar.splice(i, 1);
-            });
-
-            frames++; 
-            if (frames % 10 === 0) puntos++;
-            if (frames % 600 === 0) velocidadJuego += 0.5;
-            puntosTxt.innerText = puntos;
-
-            if (puntos > record) {
-                record = puntos; 
-                localStorage.setItem('glow_record', record);
-                document.getElementById('record-txt').innerText = record;
-            }
-
-            if (puntos >= UMBRAL && !victoriaAlcanzada) { 
-                victoriaAlcanzada = true; 
-                mostrarVictoria(); 
-            }
-
-            barraProgreso.style.width = Math.min((puntos/UMBRAL)*100, 100) + "%";
-            glowTxt.innerText = silueta.brillo > 15 ? "¡RADIANTE! ✨" : "Normal";
-            requestAnimationFrame(loop);
+    // --- 1. LÓGICA DE ETAPAS Y ACTIVACIÓN ÚNICA DEL JEFE ---
+    if (puntos < 1000) {
+        etapaActual = "dia";
+    } else if (puntos >= 1000 && puntos < 2000) {
+        etapaActual = "tarde";
+        if (!jefeDerrotado && !modoJefe) {
+            modoJefe = true;
+            jefeActual = new Jefe(); 
+        if (musicaFondo) musicaFondo.pause(); 
+        if (musicaJefe) musicaJefe.play();
+            console.log("¡Aparece el Estrés!");
         }
-        
+    } else if (puntos >= 2000) {
+        etapaActual = "noche";
+    }
+
+    dibujarFondo();
+
+    // --- 2. ELEMENTOS DE AMBIENTE (Carteles y Vehículos) ---
+    // Se mueven solo si NO estamos en pelea, pero se dibujan siempre
+    cartelesMarca.forEach((c, i) => {
+        if (!modoJefe) c.actualizar(); 
+        c.dibujar();
+        if (c.x < -150) cartelesMarca.splice(i, 1);
+    });
+
+    vehiculos.forEach((v, i) => {
+        if (!modoJefe) v.actualizar();
+        v.dibujar();
+        if (v.x < -100) vehiculos.splice(i, 1);
+    });
+
+    // --- 3. DIVISIÓN DE LÓGICA: CARRERA vs JEFE ---
+    if (!modoJefe) {
+        // --- MODO CARRERA ---
+        if (frames % 450 === 0 && cartelesMarca.length < 2) cartelesMarca.push(new CartelMarca());
+        if (frames % 250 === 0 && vehiculos.length < 3) vehiculos.push(new Vehiculo());
+        if (frames % 100 === 0) obstaculos.push(new Obstaculo());
+        if (frames % 180 === 0) poderes.push(new Poder());
+
+        /* Obstáculos y Poderes */
+        obstaculos.forEach((ob, i) => {
+            ob.x -= velocidadJuego; 
+            ob.dibujar();
+            if (silueta.x < ob.x+ob.w && silueta.x+silueta.w > ob.x && silueta.y < ob.y+ob.h && silueta.y+silueta.h > ob.y) {
+                if (silueta.tieneEscudo) { 
+                    silueta.tieneEscudo = false; 
+                    obstaculos.splice(i, 1); 
+                } else { 
+                    sonar('golpe'); 
+                    gameOver(); 
+                }
+            }
+        });
+
+        poderes.forEach((p, i) => {
+            p.x -= velocidadJuego; 
+            p.dibujar();
+            if (silueta.x < p.x+p.w && silueta.x+silueta.w > p.x && silueta.y < p.y+p.h && silueta.y+silueta.h > p.y) {
+                sonar('punto');
+                if (p.tipo.e === "glow") { silueta.brillo = 35; flashFondo = 0.4; }
+                else if (p.tipo.e === "escudo") { silueta.tieneEscudo = true; }
+                puntos += 50; 
+                poderes.splice(i, 1);
+            }
+        });
+
+        frames++; 
+        if (frames % 10 === 0) puntos++;
+        if (frames % 600 === 0) velocidadJuego += 0.5;
+
+    } else {
+        // --- MODO JEFE (El mundo está frenado) ---
+        obstaculos.forEach(ob => ob.dibujar());
+        poderes.forEach(p => p.dibujar());
+
+if (jefeActual) {
+        jefeActual.actualizar();
+        jefeActual.dibujar();
+
+        // --- EL JEFE ATACA ---
+        if (frames % 120 === 0) {
+            let ataque = new Obstaculo();
+            ataque.x = jefeActual.x; 
+            // Importante: le damos una velocidad fija porque velocidadJuego está en 0
+            ataque.velocidadAtaque = 7; 
+            obstaculos.push(ataque);
+        }
+
+        // --- ACTUALIZAR OBSTÁCULOS EN MODO JEFE ---
+        // Esto es lo que faltaba: hacer que se muevan hacia la izquierda
+        obstaculos.forEach((ob, index) => {
+            ob.x -= 7; // Lo movemos manualmente
+            ob.dibujar();
+
+            // Colisión con la silueta
+            if (silueta.x < ob.x + ob.w && silueta.x + silueta.w > ob.x &&
+                silueta.y < ob.y + ob.h && silueta.y + silueta.h > ob.y) {
+                
+                if (silueta.tieneEscudo) {
+                    silueta.tieneEscudo = false;
+                    obstaculos.splice(index, 1);
+                } else {
+                    sonar('golpe');
+                    gameOver();
+                }
+            }
+
+            // Limpieza si se van de pantalla
+            if (ob.x < -100) obstaculos.splice(index, 1);
+        });
+
+        // --- MANEJO DE RAYITOS (Tu código que ya tenías) ---
+        proyectiles.forEach((pr, index) => {
+            pr.actualizar();
+            pr.dibujar();
+
+            if (pr.x < jefeActual.x + 100 && pr.x + pr.w > jefeActual.x - 100 &&
+                pr.y < jefeActual.y + 100 && pr.y + pr.h > jefeActual.y - 100) {
+                
+                jefeActual.vidaActual -= 1;
+                proyectiles.splice(index, 1);
+                sonar('punto');
+                
+                if (jefeActual.vidaActual <= 0) {
+                    jefeDerrotado = true;
+                    modoJefe = false;
+                    jefeActual = null;
+                    proyectiles = [];
+                    puntos += 500;
+                    if (musicaJefe) {
+                    musicaJefe.pause();
+                    musicaJefe.currentTime = 0; // Lo reseteamos para la próxima
+                    }
+                    if (musicaFondo) musicaFondo.play();
+                    console.log("¡Batalla ganada! El cielo se despeja.");
+                }
+            }
+
+            if (pr.x > canvas.width) {
+                proyectiles.splice(index, 1);
+            }
+        });
+    }
+    }
+    // --- 4. PERSONAJE Y PARTICULAS ---
+    silueta.actualizar();
+    silueta.dibujar();
+
+    if (silueta.y >= canvas.height - silueta.h - 5 && frames % 5 === 0) {
+        particulasCaminar.push(new ParticulaCaminar(silueta.x, silueta.y + silueta.h));
+    }
+    particulasCaminar.forEach((p, i) => {
+        p.actualizar(); p.dibujar();
+        if (p.alpha <= 0) particulasCaminar.splice(i, 1);
+    });
+
+    // --- 5. UI Y VICTORIA ---
+    puntosTxt.innerText = puntos;
+    if (puntos > record) {
+        record = puntos; 
+        localStorage.setItem('glow_record', record);
+        document.getElementById('record-txt').innerText = record;
+    }
+    if (puntos >= UMBRAL && !victoriaAlcanzada) { 
+        victoriaAlcanzada = true; 
+        mostrarVictoria(); 
+    }
+    barraProgreso.style.width = Math.min((puntos/UMBRAL)*100, 100) + "%";
+    glowTxt.innerText = silueta.brillo > 15 ? "¡RADIANTE! ✨" : "Normal";
+    
+    requestAnimationFrame(loop);
+}
+
         class ParticulaCaminar {
             constructor(x, y) { 
                 this.x = x; 
@@ -672,6 +740,63 @@ class CartelMarca {
             }
         }
         
+       class Jefe {
+    constructor() {
+        this.x = canvas.width - 200; // Se posiciona a la derecha
+        this.y = 150;                // Altura media para que no se salga por arriba
+        this.vidaMax = 20;
+        this.vidaActual = 20;
+        this.direccionY = 1;
+    }
+
+    actualizar() {
+        // Movimiento de flote (arriba y abajo)
+        this.y += 1 * this.direccionY;
+        if (this.y > 220 || this.y < 80) {
+            this.direccionY *= -1;
+        }
+    }
+
+    dibujar() {
+        ctx.save();
+        
+        // 1. Dibujamos la Nube (Emoji)
+        // Usamos Arial para asegurar que el navegador encuentre una fuente
+        ctx.font = "150px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("☁️", this.x, this.y);
+
+        // 2. Barra de Vida - FONDO (Negro)
+        ctx.fillStyle = "black";
+        ctx.fillRect(this.x - 75, this.y - 100, 150, 12);
+
+        // 3. Barra de Vida - RELLENO (Rosa Luminares)
+        let anchoVida = (this.vidaActual / this.vidaMax) * 150;
+        ctx.fillStyle = "#db2777";
+        ctx.fillRect(this.x - 75, this.y - 100, anchoVida, 12);
+        
+        ctx.restore();
+    }
+}
+
+        function manejarAccion() {
+    if (modoJefe) {
+        // --- EN MODO JEFE HACE LAS DOS COSAS ---
+        
+        // 1. Salta para esquivar
+        silueta.saltar(); 
+        
+        // 2. Dispara para atacar
+        if (jefeActual) {
+            proyectiles.push(new Proyectil(silueta.x, silueta.y));
+            sonar('disparo'); 
+        }
+    } else {
+        // --- FUERA DE MODO JEFE SOLO SALTA ---
+        silueta.saltar();
+    }
+}
 
         function iniciarPartida() {
             // 1. Música (con protección por si no existe el elemento)
@@ -720,6 +845,23 @@ class CartelMarca {
             if (puntosTxtElem) {
                 puntosTxtElem.style.color = "#db2777"; 
             }
+            if (musicaJefe) {
+        musicaJefe.pause();
+        musicaJefe.currentTime = 0;
+    }
+    
+    // Si la música principal estaba pausada por la pelea, la reanudamos
+    if (musicaFondo) {
+        musicaFondo.volume = 0.3;
+        // No hace falta darle play acá si ya lo hacés al principio de la función
+    }
+
+    // Variables de control
+    modoJefe = false;
+    jefeDerrotado = false;
+    jefeActual = null;
+    proyectiles = [];
+
 
             // 6. Activar juego y ocultar pantalla
             juegoActivo = true; 
@@ -732,6 +874,29 @@ class CartelMarca {
 
             requestAnimationFrame(loop);
         }
+
+        class Proyectil {
+    constructor(x, y) {
+        this.x = x + 30; // Sale desde la silueta
+        this.y = y + 25; // Altura de las manos
+        this.w = 30;
+        this.h = 6;
+        this.velocidad = 12;
+    }
+
+    actualizar() {
+        this.x += this.velocidad;
+    }
+
+    dibujar() {
+        ctx.save();
+        ctx.fillStyle = "#f472b6"; // Rosa brillante
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#db2777";
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.restore();
+    }
+}
 
         function gameOver() {
             canvas.classList.add('shake-efecto');
@@ -747,8 +912,19 @@ class CartelMarca {
             }, 400);
         }
 
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); if(juegoActivo) silueta.saltar(); }, {passive: false});
-        window.addEventListener('keydown', (e) => { if(e.code === 'Space') { if(juegoActivo) silueta.saltar(); else iniciarPartida(); }});
+        canvas.addEventListener('touchstart', (e) => { 
+    e.preventDefault(); 
+    if(juegoActivo) manejarAccion(); 
+}, {passive: false});
+        window.addEventListener('keydown', (e) => { 
+    if (e.code === 'Space') { 
+        if (juegoActivo) {
+            manejarAccion(); // <-- Ella decide si saltar o disparar
+        } else {
+            iniciarPartida(); 
+        }
+    }
+});
         function abrirModal() { document.getElementById('modal-guia').style.display = 'flex'; }
         function cerrarModal() { document.getElementById('modal-guia').style.display = 'none'; }
         function mostrarVictoria() { juegoActivo = false; document.getElementById('pantalla-victoria').style.display = 'flex'; }
@@ -763,6 +939,28 @@ class CartelMarca {
             else { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); gain.gain.setValueAtTime(0.2, audioCtx.currentTime); }
             osc.start(); gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2); osc.stop(audioCtx.currentTime + 0.2);
         }
+
+function sonar(tipo) {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+
+    if (tipo === 'punto' || tipo === 'disparo') { // <--- Agregamos 'disparo' aquí
+        osc.type = 'triangle'; 
+        osc.frequency.setValueAtTime(tipo === 'disparo' ? 800 : 600, audioCtx.currentTime); 
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime); 
+    } else { 
+        osc.type = 'sawtooth'; 
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime); 
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime); 
+    }
+    // ... resto del código de sonar ...
+    osc.start(); 
+    gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.1); 
+    osc.stop(audioCtx.currentTime + 0.1);
+}
+
     </script>
 </body>
 </html>
