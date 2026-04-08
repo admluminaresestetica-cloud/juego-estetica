@@ -116,8 +116,6 @@
     </style>
 </head>
 <body>
-    
-<audio id="musica-fondo" src="musica-juegoloop.mp3" loop></audio>
 
 <div id="cartel-rotar">
     <div class="contenido-cartel">
@@ -148,6 +146,7 @@
         color: white; border-radius: 5px; font-weight: bold; cursor: pointer;
     }
 </style>
+<audio id="musica-fondo" src="musica-juegoloop.mp3" loop></audio>
 
 <div id="contenedor-juego">
     <h2 style="color: #db2777; margin-bottom: 10px;">✨ Luminares Glow ✨</h2>
@@ -222,8 +221,8 @@
         const barraProgreso = document.getElementById('barra-progreso');
         const pantallaInicio = document.getElementById('pantalla-inicio');
 
-        let puntos = 0, juegoActivo = false, frames = 0, velocidadJuego = 5;
-        let obstaculos = [], poderes = [], particulasCaminar = [], ciudad = [];
+        let puntos = 0, juegoActivo = false, frames = 0, velocidadJuego = 5, etapaActual = "dia";
+        let obstaculos = [], poderes = [], particulasCaminar = [], ciudad = []; vehiculos = [];
         let flashFondo = 0; 
         const UMBRAL = 1500;
         let victoriaAlcanzada = false;
@@ -321,23 +320,58 @@
         };
 
         function dibujarFondo() {
-            let baseColor = flashFondo > 0 ? `rgba(251, 191, 36, ${flashFondo})` : "#fff5f7";
-            ctx.fillStyle = baseColor; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            if (flashFondo > 0) flashFondo -= 0.05;
-            ctx.fillStyle = "#fce7f3"; 
-            ciudad.forEach(obj => {
-                obj.x -= velocidadJuego * 0.3; 
-                if (obj.x + obj.w < 0) obj.x = canvas.width + 50;
-                if (obj.tipo === 'casa') {
-                    ctx.fillRect(obj.x, canvas.height - obj.h - 2, obj.w, obj.h);
-                    ctx.beginPath(); ctx.moveTo(obj.x, canvas.height-obj.h-2); ctx.lineTo(obj.x+obj.w/2, canvas.height-obj.h-15); ctx.lineTo(obj.x+obj.w, canvas.height-obj.h-2); ctx.fill();
-                } else {
-                    ctx.beginPath(); ctx.arc(obj.x + 10, canvas.height - 25, 15, 0, Math.PI*2); ctx.fill(); ctx.fillRect(obj.x + 8, canvas.height - 15, 4, 15);
-                }
-            });
-            ctx.strokeStyle = "#db277733"; ctx.beginPath(); ctx.moveTo(0, 198); ctx.lineTo(600, 198); ctx.stroke();
-        }
+    // 1. Definimos los colores según la etapa actual
+    let cielo, colorCiudad;
 
+    if (etapaActual === "tarde") {
+        cielo = "#fef3c7";      // Amarillo atardecer
+        colorCiudad = "#fde68a"; // Edificios dorados
+    } else if (etapaActual === "noche") {
+        cielo = "#1e293b";      // Azul noche oscuro
+        colorCiudad = "#334155"; // Edificios grisáceos
+    } else {
+        cielo = "#fff5f7";      // Rosa original (Día)
+        colorCiudad = "#fce7f3"; // Rosa edificios original
+    }
+
+    // 2. Lógica del flash y dibujo del cielo
+    let baseColor = flashFondo > 0 ? `rgba(251, 191, 36, ${flashFondo})` : cielo;
+    ctx.fillStyle = baseColor; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    if (flashFondo > 0) flashFondo -= 0.05;
+
+    // 3. Dibujo de la ciudad (edificios y árboles) con el color de la etapa
+    ctx.fillStyle = colorCiudad; 
+    ciudad.forEach(obj => {
+        obj.x -= velocidadJuego * 0.3; 
+        if (obj.x + obj.w < 0) obj.x = canvas.width + 50;
+        
+        if (obj.tipo === 'casa') {
+            // Dibuja la base de la casa
+            ctx.fillRect(obj.x, canvas.height - obj.h - 2, obj.w, obj.h);
+            // Dibuja el techo
+            ctx.beginPath(); 
+            ctx.moveTo(obj.x, canvas.height - obj.h - 2); 
+            ctx.lineTo(obj.x + obj.w / 2, canvas.height - obj.h - 15); 
+            ctx.lineTo(obj.x + obj.w, canvas.height - obj.h - 2); 
+            ctx.fill();
+        } else {
+            // Dibuja el árbol (copa y tronco)
+            ctx.beginPath(); 
+            ctx.arc(obj.x + 10, canvas.height - 25, 15, 0, Math.PI * 2); 
+            ctx.fill(); 
+            ctx.fillRect(obj.x + 8, canvas.height - 15, 4, 15);
+        }
+    });
+
+    // 4. Línea del suelo
+    ctx.strokeStyle = "#db277733"; 
+    ctx.beginPath(); 
+    ctx.moveTo(0, 198); 
+    ctx.lineTo(600, 198); 
+    ctx.stroke();
+}
         class Obstaculo {
             constructor() {
                 this.x = canvas.width;
@@ -386,38 +420,82 @@ class Poder {
 
         function loop() {
             if (!juegoActivo) return;
+
+            // --- ACTUALIZAR LA ETAPA SEGÚN PUNTOS ---
+            if (puntos < 1000) {
+                etapaActual = "dia";
+            } else if (puntos >= 1000 && puntos < 2000) {
+                etapaActual = "tarde";
+            } else if (puntos >= 2000) {
+                etapaActual = "noche";
+            }
+            if (frames % 450 === 0 && cartelesMarca.length < 2) {
+                cartelesMarca.push(new CartelMarca());
+            }
+
             dibujarFondo();
 
-            // --- OPTIMIZACIÓN PARA CELULAR: LIMPIEZA DE MEMORIA ---
-            // Cada 60 frames (1 segundo aprox) barremos lo que quedó fuera
+            // --- NUEVO: APARECER VEHÍCULOS (Paso 3) ---
+            // Aparece un vehículo cada 250 frames si hay menos de 3 en pantalla
+            if (frames % 250 === 0 && vehiculos.length < 3) {
+                vehiculos.push(new Vehiculo());
+            }
+
+            // --- NUEVO: DIBUJAR VEHÍCULOS ---
+            // Se dibujan aquí para que queden detrás de la silueta y los obstáculos
+            vehiculos.forEach((v, i) => {
+                v.actualizar();
+                v.dibujar();
+                if (v.x < -100) vehiculos.splice(i, 1);
+            });
+            
+            cartelesMarca.forEach((c, i) => {
+                c.actualizar();
+                c.dibujar();
+                if (c.x < -150) cartelesMarca.splice(i, 1);
+            });
+
+            // --- OPTIMIZACIÓN: LIMPIEZA DE MEMORIA ---
             if (frames % 60 === 0) {
                 obstaculos = obstaculos.filter(ob => ob.x > -50);
                 poderes = poderes.filter(p => p.x > -50);
                 particulasCaminar = particulasCaminar.filter(p => p.alpha > 0);
+                vehiculos = vehiculos.filter(v => v.x > -100); // También limpiamos vehículos
             }
 
             if (frames % 100 === 0) obstaculos.push(new Obstaculo());
             if (frames % 180 === 0) poderes.push(new Poder());
 
-            /* LÓGICA DE MOVIMIENTO INDEPENDIENTE */
+            /* LÓGICA DE MOVIMIENTO INDEPENDIENTE (Obstáculos) */
             obstaculos.forEach((ob, i) => {
                 ob.x -= velocidadJuego; 
                 ob.dibujar();
                 if (silueta.x < ob.x+ob.w && silueta.x+silueta.w > ob.x && silueta.y < ob.y+ob.h && silueta.y+silueta.h > ob.y) {
-                    if (silueta.tieneEscudo) { silueta.tieneEscudo = false; obstaculos.splice(i, 1); } 
-                    else { sonar('golpe'); gameOver(); }
+                    if (silueta.tieneEscudo) { 
+                        silueta.tieneEscudo = false; 
+                        obstaculos.splice(i, 1); 
+                    } else { 
+                        sonar('golpe'); 
+                        gameOver(); 
+                    }
                 }
                 if (ob.x < -30) obstaculos.splice(i, 1);
             });
 
+            /* LÓGICA DE PODERES */
             poderes.forEach((p, i) => {
                 p.x -= velocidadJuego; 
                 p.dibujar();
                 if (silueta.x < p.x+p.w && silueta.x+silueta.w > p.x && silueta.y < p.y+p.h && silueta.y+silueta.h > p.y) {
                     sonar('punto');
-                    if (p.tipo.e === "glow") { silueta.brillo = 35; flashFondo = 0.4; } 
-                    else if (p.tipo.e === "escudo") silueta.tieneEscudo = true;
-                    puntos += 50; poderes.splice(i, 1);
+                    if (p.tipo.e === "glow") { 
+                        silueta.brillo = 35; 
+                        flashFondo = 0.4; 
+                    } else if (p.tipo.e === "escudo") {
+                        silueta.tieneEscudo = true;
+                    }
+                    puntos += 50; 
+                    poderes.splice(i, 1);
                 }
                 if (p.x < -30) poderes.splice(i, 1);
             });
@@ -425,7 +503,7 @@ class Poder {
             silueta.actualizar();
             silueta.dibujar();
 
-            // CREACIÓN DE PARTÍCULAS (Solo 1 cada 5 frames para no saturar)
+            /* PARTÍCULAS AL CAMINAR */
             if (silueta.y >= canvas.height - silueta.h - 5 && frames % 5 === 0) {
                 particulasCaminar.push(new ParticulaCaminar(silueta.x, silueta.y + silueta.h));
             }
@@ -442,11 +520,15 @@ class Poder {
             puntosTxt.innerText = puntos;
 
             if (puntos > record) {
-                record = puntos; localStorage.setItem('glow_record', record);
+                record = puntos; 
+                localStorage.setItem('glow_record', record);
                 document.getElementById('record-txt').innerText = record;
             }
 
-            if (puntos >= UMBRAL && !victoriaAlcanzada) { victoriaAlcanzada = true; mostrarVictoria(); }
+            if (puntos >= UMBRAL && !victoriaAlcanzada) { 
+                victoriaAlcanzada = true; 
+                mostrarVictoria(); 
+            }
 
             barraProgreso.style.width = Math.min((puntos/UMBRAL)*100, 100) + "%";
             glowTxt.innerText = silueta.brillo > 15 ? "¡RADIANTE! ✨" : "Normal";
@@ -457,7 +539,7 @@ class Poder {
             constructor(x, y) { 
                 this.x = x; 
                 this.y = y; 
-                this.size = Math.random() * 3 + 1; // Un poco más pequeñas
+                this.size = Math.random() * 4 + 1; 
                 this.speedX = -2; 
                 this.speedY = -1; 
                 this.alpha = 1; 
@@ -465,7 +547,7 @@ class Poder {
             actualizar() { 
                 this.x += this.speedX; 
                 this.y += this.speedY; 
-                this.alpha -= 0.08; // Mueren más rápido (antes 0.05) para liberar memoria
+                this.alpha -= 0.05; 
             }
             dibujar() { 
                 ctx.save(); 
@@ -478,32 +560,176 @@ class Poder {
             }
         }
 
-        function iniciarPartida() {
-            // 1. OBTENER Y REPRODUCIR LA MÚSICA
-            const musica = document.getElementById('musica-fondo');
-            if (musica) {
-                musica.volume = 0.3; // Volumen al 30% para que no tape los efectos
-                musica.currentTime = 0; // Empieza desde el principio
-                musica.play().catch(e => console.log("Error al cargar música:", e));
+        class Vehiculo {
+            constructor() {
+                this.x = canvas.width + 100;
+                this.y = 178; // Bajamos un pelín la altura para que pisen mejor la calle
+                
+                const tipos = ["🚗", "🚕", "🚙", "🚌", "🚎"];
+                this.icon = tipos[Math.floor(Math.random() * tipos.length)];
+                
+                // Un poco más lento para que no distraiga tanto (0.5 en vez de 0.6)
+                this.velocidad = velocidadJuego * 0.5; 
+                this.w = 40;
             }
 
-            document.getElementById('contenedor-juego').classList.add('jugando');
-            
-            // Limpieza total de arrays al empezar
+            actualizar() {
+                this.x -= this.velocidad;
+            }
+
+            dibujar() {
+                ctx.save();
+                
+                // --- EL TRUCO PARA DIFERENCIARLOS ---
+                ctx.globalAlpha = 0.4; // 40% de transparencia (se ven claritos)
+                ctx.font = "28px serif"; // Más chicos para dar sensación de lejanía
+                ctx.textAlign = "center";
+                
+                // Luces en la noche
+                if (etapaActual === "noche") {
+                    ctx.shadowColor = "#fef08a";
+                    ctx.shadowBlur = 10;
+                } else if (etapaActual === "tarde") {
+                    // En la tarde los oscurecemos un poco para que no brillen tanto
+                    ctx.filter = "brightness(0.9)";
+                }
+                
+                ctx.fillText(this.icon, this.x, this.y + 15);
+                
+                ctx.restore(); // Volvemos a la opacidad normal para lo que sigue
+            }
+        }
+        
+class CartelMarca {
+            constructor() {
+                this.x = canvas.width + 100;
+                // Altura estable en la zona del cielo
+                this.y = 50; 
+                this.w = 120; // Un poco más ancho para que respire el texto
+                this.h = 42;
+                this.velocidad = velocidadJuego * 0.3; // Velocidad de fondo lejana
+                this.opacidadTotal = 0.35; // --- EL SECRETO: TRANSPARENCIA GENERAL BAJA ---
+            }
+
+            actualizar() {
+                this.x -= this.velocidad;
+                // Parpadeo casi imperceptible, muy suave
+                this.opacidadTotal = 0.30 + Math.random() * 0.05; 
+            }
+
+            dibujar() {
+                ctx.save();
+                
+                // Aplicamos la transparencia baja a TODO el cartel
+                ctx.globalAlpha = this.opacidadTotal;
+                
+                // Fondo del cartel: Casi invisible (Blanco muy transparente)
+                // Esto suaviza lo que haya detrás sin taparlo
+                ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; 
+                
+                // Borde: Rosa suave y fino, sin brillo exagerado
+                ctx.strokeStyle = "#db2777"; 
+                ctx.lineWidth = 1; // Borde más fino
+                
+                // Resplandor de neón: Muy tenue y sutil
+                ctx.shadowColor = "#db2777";
+                ctx.shadowBlur = 8; // Brillo suave
+
+                // Dibujar el cartel (fondo y borde suave)
+                // Usamos roundRect para bordes suaves si el navegador lo soporta
+                if (ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(this.x, this.y, this.w, this.h, 8);
+                    ctx.fill();
+                    ctx.stroke();
+                } else {
+                    // Alternativa para navegadores viejos
+                    ctx.fillRect(this.x, this.y, this.w, this.h);
+                    ctx.strokeRect(this.x, this.y, this.w, this.h);
+                }
+
+                // TEXTO DE LA MARCA (Rosa suave, integrado)
+                
+                // Usamos el mismo rosa del borde para que todo combine
+                ctx.fillStyle = "#db2777"; 
+                
+                // Sin sombra extra en el texto para que no flote, sino que esté "grabado"
+                ctx.shadowBlur = 0; 
+
+                ctx.textAlign = "center";
+                
+                // Primera línea: LUMINARES (Fuente más fina)
+                ctx.font = "500 15px sans-serif"; // '500' es un peso medio, no bold
+                ctx.letterSpacing = "1px"; 
+                ctx.fillText("LUMINARES", this.x + this.w/2, this.y + 19);
+                
+                // Segunda línea: ESTÉTICA
+                ctx.font = "400 10px sans-serif"; // '400' es peso normal
+                ctx.letterSpacing = "3px"; // Espaciado elegante y amplio
+                ctx.fillText("ESTÉTICA", this.x + this.w/2, this.y + 34);
+
+                ctx.restore(); // Importante para no afectar el resto del juego
+            }
+        }
+        
+
+        function iniciarPartida() {
+            // 1. Música (con protección por si no existe el elemento)
+            const musica = document.getElementById('musica-fondo');
+            if (musica) {
+                musica.volume = 0.3;
+                musica.currentTime = 0;
+                musica.play().catch(e => console.log("Audio esperando clic"));
+            }
+
+            // --- RESETEO DE ETAPA ---
+            etapaActual = "dia"; 
+
+            // 2. Reseteo visual del contenedor
+            const contenedor = document.getElementById('contenedor-juego');
+            if (contenedor) {
+                contenedor.classList.add('jugando');
+            }
+
+            // 3. Reseteo de variables de lógica
             puntos = 0; 
             frames = 0; 
             velocidadJuego = 5; 
             obstaculos = []; 
             poderes = []; 
-            particulasCaminar = []; 
+            cartelesMarca = [];
+            
+            // --- NUEVO: RESETEO DE VEHÍCULOS ---
+            vehiculos = []; 
+
+            if (typeof particulasCaminar !== 'undefined') {
+                particulasCaminar = []; 
+            }
             
             victoriaAlcanzada = false; 
-            silueta.y = 150; 
-            silueta.brillo = 0; 
-            silueta.tieneEscudo = false;
             
+            // 4. Reseteo de la silueta (con protección)
+            if (typeof silueta !== 'undefined') {
+                silueta.y = 150; 
+                silueta.brillo = 0; 
+                silueta.tieneEscudo = false;
+            }
+            
+            // 5. Reseteo de color de texto
+            const puntosTxtElem = document.getElementById('puntos-txt');
+            if (puntosTxtElem) {
+                puntosTxtElem.style.color = "#db2777"; 
+            }
+
+            // 6. Activar juego y ocultar pantalla
             juegoActivo = true; 
-            pantallaInicio.classList.add('oculto');
+            if (typeof pantallaInicio !== 'undefined' && pantallaInicio) {
+                pantallaInicio.classList.add('oculto');
+            } else {
+                const pInicio = document.getElementById('pantalla-inicio');
+                if (pInicio) pInicio.classList.add('oculto');
+            }
+
             requestAnimationFrame(loop);
         }
 
