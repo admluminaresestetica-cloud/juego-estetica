@@ -357,21 +357,28 @@ class Poder {
 
     // --- REEMPLAZÁ SOLO ESTA FUNCIÓN DIBUJAR() ---
     dibujar() { 
-        ctx.save(); // Guardamos el estado del canvas
-        ctx.font = "22px serif"; 
-        ctx.textAlign = "center"; // Centramos el dibujo para que el borde quede parejo
+        ctx.save();
+        ctx.font = "26px serif"; // Lo agrandamos un poco más para que sea un objetivo claro
+        ctx.textAlign = "center";
         
-        // Si es el paraguas, le dibujamos un contorno blanco para que resalte
         if (this.tipo.i === "☂️") {
-            ctx.strokeStyle = "white"; // Color del borde
-            ctx.lineWidth = 3;         // Grosor del borde
-            ctx.strokeText(this.tipo.i, this.x + 12, this.y + 20); // Dibujamos el borde
+            // === EFECTO DE RESPLANDOR DE NEÓN (CIAN ELÉCTRICO) ===
+            // 1. Sombra exterior (el resplandor)
+            ctx.shadowColor = "#00ffff"; // Cian puro/Turquesa eléctrico
+            ctx.shadowBlur = 15;         // Un resplandor amplio y suave
+            ctx.shadowOffsetX = 0;        
+            ctx.shadowOffsetY = 0;        // Centrado para que parezca que emite luz
+
+            // 2. Un borde cian sólido para definir la silueta
+            ctx.strokeStyle = "#00ffff";
+            ctx.lineWidth = 2;
+            ctx.strokeText(this.tipo.i, this.x + 12, this.y + 20);
         }
         
-        // Dibujamos el emoji normal arriba (esto aplica para todos los poderes)
+        // Dibujamos el emoji (con el resplandor cian aplicado si es el paraguas)
         ctx.fillText(this.tipo.i, this.x + 12, this.y + 20); 
         
-        ctx.restore(); // Restauramos el estado del canvas
+        ctx.restore(); // Limpiamos la sombra para no afectar a otros dibujos
     }
 }
 
