@@ -148,6 +148,7 @@
 </style>
 <audio id="musica-fondo" src="musica-juegoloop.mp3" loop></audio>
 <audio id="musica-jefe" src="musica-jefe.mp3" loop></audio>
+<audio id="sonido-trueno" src="sonido-trueno.mp3"></audio>
 
 <div id="contenedor-juego">
     <h2 style="color: #db2777; margin-bottom: 10px;">✨ Luminares Glow ✨</h2>
@@ -223,6 +224,7 @@
         const pantallaInicio = document.getElementById('pantalla-inicio');
         const musicaFondo = document.getElementById('musica-fondo');
         const musicaJefe = document.getElementById('musica-jefe');
+        const sonidoTrueno = document.getElementById('sonido-trueno');
 
         let puntos = 0, juegoActivo = false, frames = 0, velocidadJuego = 5, etapaActual = "dia";
         let obstaculos = [], poderes = [], particulasCaminar = [], ciudad = []; vehiculos = [];
@@ -230,6 +232,10 @@
         let modoJefe = false;        // Controla si el mundo está frenado para la pelea
         let jefeDerrotado = false;   // Para que el jefe aparezca una sola vez a los 1000 pts
         let jefeActual = null;       // Aquí guardaremos la información de la "Nube"
+        // --- VARIABLES DE EFECTOS VISUALES (Agrégalas aquí) ---
+        let screenShakeTimer = 0;   // Tiempo que dura la sacudida
+        let screenShakeIntensity = 0; // Qué tan fuerte sacude
+        let victoryFlashAlpha = 0;   // La opacidad del flash blanco (0 a 1)
         let proyectiles = [];        // Aquí guardaremos los rayitos que lances
         let musicaJefeSonando = false;
         const UMBRAL = 2000;
@@ -437,8 +443,12 @@ class Poder {
         if (!jefeDerrotado && !modoJefe) {
             modoJefe = true;
             jefeActual = new Jefe(); 
-        if (musicaFondo) musicaFondo.pause(); 
-        if (musicaJefe) musicaJefe.play();
+            obstaculos = []; // Limpiamos mesa para la pelea
+            if (musicaFondo) musicaFondo.pause(); 
+            if (musicaJefe) {
+                musicaJefe.currentTime = 0;
+                musicaJefe.play();
+            }
             console.log("¡Aparece el Estrés!");
         }
     } else if (puntos >= 2000) {
@@ -447,8 +457,7 @@ class Poder {
 
     dibujarFondo();
 
-    // --- 2. ELEMENTOS DE AMBIENTE (Carteles y Vehículos) ---
-    // Se mueven solo si NO estamos en pelea, pero se dibujan siempre
+    // --- 2. ELEMENTOS DE AMBIENTE ---
     cartelesMarca.forEach((c, i) => {
         if (!modoJefe) c.actualizar(); 
         c.dibujar();
@@ -461,7 +470,9 @@ class Poder {
         if (v.x < -100) vehiculos.splice(i, 1);
     });
 
-    // --- 3. DIVISIÓN DE LÓGICA: CARRERA vs JEFE ---
+    // --- 3. LÓGICA DE JUEGO (SIEMPRE AVANZAR FRAMES) ---
+    frames++; // Movido afuera para que el tiempo no se congele
+
     if (!modoJefe) {
         // --- MODO CARRERA ---
         if (frames % 450 === 0 && cartelesMarca.length < 2) cartelesMarca.push(new CartelMarca());
@@ -469,10 +480,10 @@ class Poder {
         if (frames % 100 === 0) obstaculos.push(new Obstaculo());
         if (frames % 180 === 0) poderes.push(new Poder());
 
-        /* Obstáculos y Poderes */
         obstaculos.forEach((ob, i) => {
             ob.x -= velocidadJuego; 
             ob.dibujar();
+            // Colisión carrera
             if (silueta.x < ob.x+ob.w && silueta.x+silueta.w > ob.x && silueta.y < ob.y+ob.h && silueta.y+silueta.h > ob.y) {
                 if (silueta.tieneEscudo) { 
                     silueta.tieneEscudo = false; 
@@ -484,50 +495,29 @@ class Poder {
             }
         });
 
-        poderes.forEach((p, i) => {
-            p.x -= velocidadJuego; 
-            p.dibujar();
-            if (silueta.x < p.x+p.w && silueta.x+silueta.w > p.x && silueta.y < p.y+p.h && silueta.y+silueta.h > p.y) {
-                sonar('punto');
-                if (p.tipo.e === "glow") { silueta.brillo = 35; flashFondo = 0.4; }
-                else if (p.tipo.e === "escudo") { silueta.tieneEscudo = true; }
-                puntos += 50; 
-                poderes.splice(i, 1);
-            }
-        });
-
-        frames++; 
         if (frames % 10 === 0) puntos++;
         if (frames % 600 === 0) velocidadJuego += 0.5;
 
     } else {
-        // --- MODO JEFE (El mundo está frenado) ---
-        obstaculos.forEach(ob => ob.dibujar());
-        poderes.forEach(p => p.dibujar());
+        // --- MODO JEFE ---
+        if (jefeActual) {
+            jefeActual.actualizar();
+            jefeActual.dibujar();
 
-if (jefeActual) {
-        jefeActual.actualizar();
-        jefeActual.dibujar();
-
-        // --- EL JEFE ATACA ---
-        if (frames % 120 === 0) {
-            let ataque = new Obstaculo();
-            ataque.x = jefeActual.x; 
-            // Importante: le damos una velocidad fija porque velocidadJuego está en 0
-            ataque.velocidadAtaque = 7; 
-            obstaculos.push(ataque);
+            // Ataque del jefe (Ahora sí funciona porque frames avanza)
+            if (frames % 120 === 0) {
+                let ataque = new Obstaculo();
+                ataque.x = jefeActual.x; 
+                obstaculos.push(ataque);
+            }
         }
 
-        // --- ACTUALIZAR OBSTÁCULOS EN MODO JEFE ---
-        // Esto es lo que faltaba: hacer que se muevan hacia la izquierda
+        // Mover ataques del jefe y detectar colisión (UN SOLO BUCLE)
         obstaculos.forEach((ob, index) => {
-            ob.x -= 7; // Lo movemos manualmente
+            ob.x -= 7; 
             ob.dibujar();
-
-            // Colisión con la silueta
             if (silueta.x < ob.x + ob.w && silueta.x + silueta.w > ob.x &&
                 silueta.y < ob.y + ob.h && silueta.y + silueta.h > ob.y) {
-                
                 if (silueta.tieneEscudo) {
                     silueta.tieneEscudo = false;
                     obstaculos.splice(index, 1);
@@ -536,45 +526,66 @@ if (jefeActual) {
                     gameOver();
                 }
             }
-
-            // Limpieza si se van de pantalla
             if (ob.x < -100) obstaculos.splice(index, 1);
         });
 
-        // --- MANEJO DE RAYITOS (Tu código que ya tenías) ---
+        // Rayitos del jugador
         proyectiles.forEach((pr, index) => {
             pr.actualizar();
             pr.dibujar();
-
-            if (pr.x < jefeActual.x + 100 && pr.x + pr.w > jefeActual.x - 100 &&
-                pr.y < jefeActual.y + 100 && pr.y + pr.h > jefeActual.y - 100) {
+            if (jefeActual && pr.x < jefeActual.x + 80 && pr.x + pr.w > jefeActual.x - 80 &&
+                pr.y < jefeActual.y + 80 && pr.y + pr.h > jefeActual.y - 80) {
                 
                 jefeActual.vidaActual -= 1;
                 proyectiles.splice(index, 1);
                 sonar('punto');
                 
                 if (jefeActual.vidaActual <= 0) {
-                    jefeDerrotado = true;
-                    modoJefe = false;
-                    jefeActual = null;
-                    proyectiles = [];
-                    puntos += 500;
-                    if (musicaJefe) {
-                    musicaJefe.pause();
-                    musicaJefe.currentTime = 0; // Lo reseteamos para la próxima
-                    }
-                    if (musicaFondo) musicaFondo.play();
-                    console.log("¡Batalla ganada! El cielo se despeja.");
-                }
-            }
+    jefeDerrotado = true;
+    modoJefe = false;
+    jefeActual = null;
+    proyectiles = [];
+    puntos += 500;
+    
+    // --- EFECTOS VISUALES ---
+    screenShakeTimer = 60; 
+    screenShakeIntensity = 15; 
+    victoryFlashAlpha = 1; 
 
-            if (pr.x > canvas.width) {
-                proyectiles.splice(index, 1);
+    // --- NUEVO: EFECTO DE SONIDO ---
+    if (sonidoTrueno) {
+        sonidoTrueno.currentTime = 0; // Para que suene instantáneo
+        sonidoTrueno.play();
+    }
+
+    // --- CONTROL DE MÚSICA ---
+    if (musicaJefe) { 
+        musicaJefe.pause(); 
+        musicaJefe.currentTime = 0; 
+    }
+    if (musicaFondo) musicaFondo.play();
+
+    console.log("¡BOOM! Jefe derrotado.");
+}
             }
+            if (pr.x > canvas.width) proyectiles.splice(index, 1);
         });
     }
-    }
-    // --- 4. PERSONAJE Y PARTICULAS ---
+
+    // --- 4. PODERES (Comunes a ambos modos) ---
+    poderes.forEach((p, i) => {
+        if (!modoJefe) p.x -= velocidadJuego; 
+        p.dibujar();
+        if (silueta.x < p.x+p.w && silueta.x+silueta.w > p.x && silueta.y < p.y+p.h && silueta.y+silueta.h > p.y) {
+            sonar('punto');
+            if (p.tipo.e === "glow") { silueta.brillo = 35; flashFondo = 0.4; }
+            else if (p.tipo.e === "escudo") { silueta.tieneEscudo = true; }
+            puntos += 50; 
+            poderes.splice(i, 1);
+        }
+    });
+
+    // --- 5. PERSONAJE Y UI ---
     silueta.actualizar();
     silueta.dibujar();
 
@@ -586,7 +597,6 @@ if (jefeActual) {
         if (p.alpha <= 0) particulasCaminar.splice(i, 1);
     });
 
-    // --- 5. UI Y VICTORIA ---
     puntosTxt.innerText = puntos;
     if (puntos > record) {
         record = puntos; 
@@ -599,10 +609,43 @@ if (jefeActual) {
     }
     barraProgreso.style.width = Math.min((puntos/UMBRAL)*100, 100) + "%";
     glowTxt.innerText = silueta.brillo > 15 ? "¡RADIANTE! ✨" : "Normal";
+
+    if (screenShakeTimer > 0) {
+        // Calculamos un desplazamiento aleatorio basado en la intensidad
+        let dx = (Math.random() - 0.5) * screenShakeIntensity;
+        let dy = (Math.random() - 0.5) * screenShakeIntensity;
+        
+        // Movemos todo el canvas temporalmente
+        ctx.translate(dx, dy);
+        
+        // Reducimos el temporizador y la intensidad para que se detenga suavemente
+        screenShakeTimer--;
+        screenShakeIntensity *= 0.95; // Se vuelve más débil cada frame
+    }
+
+    // 2. Efecto Victory Flash (Destello Blanco)
+if (victoryFlashAlpha > 0) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${victoryFlashAlpha})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    victoryFlashAlpha -= 0.01; // Lo hacemos un poquito más lento para que se luzca
+
+    // NUEVO: El volumen del trueno sigue la opacidad del flash
+    if (sonidoTrueno) {
+        // El volumen va de 1.0 a 0.0 siguiendo al flash
+        sonidoTrueno.volume = Math.max(0, victoryFlashAlpha); 
+    }
+
+    if (victoryFlashAlpha <= 0) {
+        if (sonidoTrueno) {
+            sonidoTrueno.pause();
+            sonidoTrueno.volume = 1; // Reseteamos volumen para la próxima
+        }
+    }
+}
     
     requestAnimationFrame(loop);
 }
-
         class ParticulaCaminar {
             constructor(x, y) { 
                 this.x = x; 
@@ -742,40 +785,69 @@ class CartelMarca {
         
        class Jefe {
     constructor() {
-        this.x = canvas.width - 200; // Se posiciona a la derecha
-        this.y = 150;                // Altura media para que no se salga por arriba
-        this.vidaMax = 20;
-        this.vidaActual = 20;
-        this.direccionY = 1;
+        // Empieza fuera de la pantalla a la derecha
+        this.x = canvas.width + 150; 
+        this.y = 150; 
+        this.w = 160; // Ancho para colisiones con tus rayos
+        this.h = 100; // Alto
+        this.vidaTotal = 30; // Podés subirla si querés que dure más
+        this.vidaActual = 30;
     }
 
     actualizar() {
-        // Movimiento de flote (arriba y abajo)
-        this.y += 1 * this.direccionY;
-        if (this.y > 220 || this.y < 80) {
-            this.direccionY *= -1;
+        // Entra lentamente hasta quedarse a una distancia fija del jugador
+        if (this.x > canvas.width - 250) {
+            this.x -= 2;
         }
+        // Efecto de flotación suave usando el tiempo (frames)
+        this.y = 150 + Math.sin(frames * 0.05) * 20;
     }
 
     dibujar() {
         ctx.save();
-        
-        // 1. Dibujamos la Nube (Emoji)
-        // Usamos Arial para asegurar que el navegador encuentre una fuente
-        ctx.font = "150px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("☁️", this.x, this.y);
 
-        // 2. Barra de Vida - FONDO (Negro)
-        ctx.fillStyle = "black";
-        ctx.fillRect(this.x - 75, this.y - 100, 150, 12);
+        // --- 1. CUERPO OSCURO (Nube de Tormenta) ---
+        ctx.fillStyle = "#1e293b"; // Gris azulado oscuro
+        ctx.beginPath();
+        // Círculos superpuestos
+        ctx.arc(this.x, this.y, 50, 0, Math.PI * 2); 
+        ctx.arc(this.x - 50, this.y + 10, 45, 0, Math.PI * 2);
+        ctx.arc(this.x + 50, this.y + 10, 45, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y - 40, 40, 0, Math.PI * 2);
+        ctx.fill();
 
-        // 3. Barra de Vida - RELLENO (Rosa Luminares)
-        let anchoVida = (this.vidaActual / this.vidaMax) * 150;
-        ctx.fillStyle = "#db2777";
-        ctx.fillRect(this.x - 75, this.y - 100, anchoVida, 12);
+        // --- 2. OJOS ROJOS AGRESIVOS ---
+        ctx.fillStyle = "#ff0000";
+        // Ojo Izquierdo (Triángulo hacia adentro)
+        ctx.beginPath();
+        ctx.moveTo(this.x - 50, this.y - 20);
+        ctx.lineTo(this.x - 15, this.y - 5);
+        ctx.lineTo(this.x - 50, this.y + 5);
+        ctx.fill();
+        // Ojo Derecho
+        ctx.beginPath();
+        ctx.moveTo(this.x + 50, this.y - 20);
+        ctx.lineTo(this.x + 15, this.y - 5);
+        ctx.lineTo(this.x + 50, this.y + 5);
+        ctx.fill();
+
+        // --- 3. BARRA DE VIDA SOBRE EL JEFE ---
+        const anchoBarra = 120;
+        const altoBarra = 10;
+        // Fondo de la barra (negro)
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(this.x - anchoBarra/2, this.y - 100, anchoBarra, altoBarra);
         
+        // Vida restante (rojo brillante)
+        ctx.fillStyle = "#ff4444";
+        let porcentajeVida = (this.vidaActual / this.vidaTotal) * anchoBarra;
+        ctx.fillRect(this.x - anchoBarra/2, this.y - 100, porcentajeVida, altoBarra);
+        
+        // Borde blanco fino
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.x - anchoBarra/2, this.y - 100, anchoBarra, altoBarra);
+
         ctx.restore();
     }
 }
