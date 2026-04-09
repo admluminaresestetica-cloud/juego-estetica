@@ -148,7 +148,7 @@
 </style>
 <audio id="musica-fondo" src="musica-juegoloop.mp3" loop></audio>
 <audio id="musica-jefe" src="musica-jefe.mp3" loop></audio>
-<audio id="sonido-trueno" src="sonido-trueno.mp3"></audio>
+<audio id="sonido-trueno" src="trueno.mp3"></audio>
 
 <div id="contenedor-juego">
     <h2 style="color: #db2777; margin-bottom: 10px;">✨ Luminares Glow ✨</h2>
@@ -237,6 +237,8 @@
         let screenShakeIntensity = 0; // Qué tan fuerte sacude
         let victoryFlashAlpha = 0;   // La opacidad del flash blanco (0 a 1)
         let proyectiles = [];        // Aquí guardaremos los rayitos que lances
+        let postes = [];
+        let loopID;
         let musicaJefeSonando = false;
         const UMBRAL = 2000;
         let victoriaAlcanzada = false;
@@ -454,8 +456,14 @@ class Poder {
     } else if (puntos >= 2000) {
         etapaActual = "noche";
     }
-
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     dibujarFondo();
+    
+    postes.forEach((p, i) => {
+        if (!modoJefe) p.actualizar(); 
+        p.dibujar();
+        if (p.x < -100) postes.splice(i, 1);
+    });
 
     // --- 2. ELEMENTOS DE AMBIENTE ---
     cartelesMarca.forEach((c, i) => {
@@ -479,6 +487,7 @@ class Poder {
         if (frames % 250 === 0 && vehiculos.length < 3) vehiculos.push(new Vehiculo());
         if (frames % 100 === 0) obstaculos.push(new Obstaculo());
         if (frames % 180 === 0) poderes.push(new Poder());
+        if (frames % 400 === 0 && etapaActual !== "dia") {postes.push(new PosteLuz());}
 
         obstaculos.forEach((ob, i) => {
             ob.x -= velocidadJuego; 
@@ -541,22 +550,25 @@ class Poder {
                 sonar('punto');
                 
                 if (jefeActual.vidaActual <= 0) {
+    // --- 1. LIMPIEZA TOTAL INMEDIATA ---
+    obstaculos.length = 0;  // Forzar el vaciado del array
+    proyectiles.length = 0; // Limpiar tus disparos
+    jefeActual = null;      // Eliminar al jefe
+    
     jefeDerrotado = true;
     modoJefe = false;
-    jefeActual = null;
-    proyectiles = [];
     puntos += 500;
     
-    // --- EFECTOS VISUALES ---
+    // --- 2. EFECTOS VISUALES Y SONIDO ---
     screenShakeTimer = 60; 
     screenShakeIntensity = 15; 
     victoryFlashAlpha = 1; 
 
-    // --- NUEVO: EFECTO DE SONIDO ---
     if (sonidoTrueno) {
-        sonidoTrueno.currentTime = 0; // Para que suene instantáneo
+        sonidoTrueno.currentTime = 0;
         sonidoTrueno.play();
     }
+
 
     // --- CONTROL DE MÚSICA ---
     if (musicaJefe) { 
@@ -610,40 +622,43 @@ class Poder {
     barraProgreso.style.width = Math.min((puntos/UMBRAL)*100, 100) + "%";
     glowTxt.innerText = silueta.brillo > 15 ? "¡RADIANTE! ✨" : "Normal";
 
+    ctx.save(); 
+
     if (screenShakeTimer > 0) {
-        // Calculamos un desplazamiento aleatorio basado en la intensidad
         let dx = (Math.random() - 0.5) * screenShakeIntensity;
         let dy = (Math.random() - 0.5) * screenShakeIntensity;
         
-        // Movemos todo el canvas temporalmente
+        // Movemos el canvas para el sacudón
         ctx.translate(dx, dy);
         
-        // Reducimos el temporizador y la intensidad para que se detenga suavemente
         screenShakeTimer--;
-        screenShakeIntensity *= 0.95; // Se vuelve más débil cada frame
+        screenShakeIntensity *= 0.95;
     }
 
     // 2. Efecto Victory Flash (Destello Blanco)
-if (victoryFlashAlpha > 0) {
-    ctx.fillStyle = `rgba(255, 255, 255, ${victoryFlashAlpha})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    victoryFlashAlpha -= 0.01; // Lo hacemos un poquito más lento para que se luzca
+    if (victoryFlashAlpha > 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${victoryFlashAlpha})`;
+        // Dibujamos el flash un poco más grande por si el sacudón nos muestra los bordes
+        ctx.fillRect(-100, -100, canvas.width + 200, canvas.height + 200);
+        
+        victoryFlashAlpha -= 0.01; 
 
-    // NUEVO: El volumen del trueno sigue la opacidad del flash
-    if (sonidoTrueno) {
-        // El volumen va de 1.0 a 0.0 siguiendo al flash
-        sonidoTrueno.volume = Math.max(0, victoryFlashAlpha); 
-    }
-
-    if (victoryFlashAlpha <= 0) {
+        // Lógica del sonido del trueno
         if (sonidoTrueno) {
-            sonidoTrueno.pause();
-            sonidoTrueno.volume = 1; // Reseteamos volumen para la próxima
+            sonidoTrueno.volume = Math.max(0, victoryFlashAlpha); 
+        }
+
+        if (victoryFlashAlpha <= 0) {
+            if (sonidoTrueno) {
+                sonidoTrueno.pause();
+                sonidoTrueno.volume = 1;
+            }
         }
     }
-}
+
+    ctx.restore(); 
     
+    // --- CIERRE DEL LOOP ---
     requestAnimationFrame(loop);
 }
         class ParticulaCaminar {
@@ -671,6 +686,57 @@ if (victoryFlashAlpha > 0) {
             }
         }
 
+
+       class PosteLuz {
+    constructor() {
+        this.x = canvas.width + 100;
+        
+        // --- AJUSTE MANUAL DE SUELO ---
+        // Si 193 levitaba, le sumamos 10 píxeles más para forzar que baje.
+        // Si ves que se hunde mucho, bajá el 203 a 198.
+        this.y = 203; 
+        
+        this.emoji = "🚏";
+        this.fontSize = 35; 
+    }
+
+    actualizar() {
+        this.x -= (velocidadJuego * 0.5);
+    }
+
+    dibujar() {
+        ctx.save();
+        
+        ctx.globalAlpha = 0.4; 
+        ctx.font = `${this.fontSize}px serif`;
+        ctx.textAlign = "center";
+        
+        // Usamos alphabetic para tener un control más tradicional de la línea
+        ctx.textBaseline = "alphabetic"; 
+
+        // Dibujamos la silueta negra
+        ctx.fillStyle = "#000000"; 
+        
+        // Le sumamos +2 o +5 aquí mismo si hace falta para que pise la raya
+        ctx.fillText(this.emoji, this.x, this.y); 
+
+        // --- LUZ NOCTURNA ---
+        if (etapaActual === "noche") {
+            let brilloY = this.y - (this.fontSize * 0.7);
+
+            ctx.globalAlpha = 0.8;
+            ctx.fillStyle = "#FFFB00"; 
+            ctx.shadowColor = "#FFFB00";
+            ctx.shadowBlur = 10;
+            
+            ctx.beginPath();
+            ctx.arc(this.x, brilloY, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+}
         class Vehiculo {
             constructor() {
                 this.x = canvas.width + 100;
@@ -785,45 +851,34 @@ class CartelMarca {
         
        class Jefe {
     constructor() {
-        // Empieza fuera de la pantalla a la derecha
         this.x = canvas.width + 150; 
         this.y = 150; 
-        this.w = 160; // Ancho para colisiones con tus rayos
-        this.h = 100; // Alto
-        this.vidaTotal = 30; // Podés subirla si querés que dure más
-        this.vidaActual = 30;
+        this.w = 160; 
+        this.h = 100; 
+        this.vidaTotal = 15; 
+        this.vidaActual = 15;
     }
 
     actualizar() {
-        // Entra lentamente hasta quedarse a una distancia fija del jugador
-        if (this.x > canvas.width - 250) {
+        if (this.x > canvas.width - 150) {
             this.x -= 2;
         }
-        // Efecto de flotación suave usando el tiempo (frames)
         this.y = 150 + Math.sin(frames * 0.05) * 20;
     }
 
     dibujar() {
         ctx.save();
 
-        // --- 1. CUERPO OSCURO (Nube de Tormenta) ---
-        ctx.fillStyle = "#1e293b"; // Gris azulado oscuro
-        ctx.beginPath();
-        // Círculos superpuestos
-        ctx.arc(this.x, this.y, 50, 0, Math.PI * 2); 
-        ctx.arc(this.x - 50, this.y + 10, 45, 0, Math.PI * 2);
-        ctx.arc(this.x + 50, this.y + 10, 45, 0, Math.PI * 2);
-        ctx.arc(this.x, this.y - 40, 40, 0, Math.PI * 2);
-        ctx.fill();
-
-        // --- 2. OJOS ROJOS AGRESIVOS ---
+        // --- 1. OJOS ROJOS (Dibujados primero para que el cuerpo tape restos) ---
         ctx.fillStyle = "#ff0000";
-        // Ojo Izquierdo (Triángulo hacia adentro)
+        
+        // Ojo Izquierdo
         ctx.beginPath();
         ctx.moveTo(this.x - 50, this.y - 20);
         ctx.lineTo(this.x - 15, this.y - 5);
         ctx.lineTo(this.x - 50, this.y + 5);
         ctx.fill();
+
         // Ojo Derecho
         ctx.beginPath();
         ctx.moveTo(this.x + 50, this.y - 20);
@@ -831,26 +886,36 @@ class CartelMarca {
         ctx.lineTo(this.x + 50, this.y + 5);
         ctx.fill();
 
-        // --- 3. BARRA DE VIDA SOBRE EL JEFE ---
-        const anchoBarra = 120;
-        const altoBarra = 10;
-        // Fondo de la barra (negro)
+        // --- 2. CUERPO OSCURO (Tapamos cualquier línea que haya quedado de los ojos) ---
+        ctx.fillStyle = "#1e293b"; 
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 50, 0, Math.PI * 2); 
+        ctx.arc(this.x - 50, this.y + 10, 45, 0, Math.PI * 2);
+        ctx.arc(this.x + 50, this.y + 10, 45, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y - 40, 40, 0, Math.PI * 2);
+        ctx.fill();
+
+        // --- 3. BARRA DE VIDA (Usando solo rectángulos directos) ---
+        const xB = this.x - 60;
+        const yB = this.y - 100;
+
+        // Fondo
         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-        ctx.fillRect(this.x - anchoBarra/2, this.y - 100, anchoBarra, altoBarra);
+        ctx.fillRect(xB, yB, 120, 10);
         
-        // Vida restante (rojo brillante)
+        // Vida
         ctx.fillStyle = "#ff4444";
-        let porcentajeVida = (this.vidaActual / this.vidaTotal) * anchoBarra;
-        ctx.fillRect(this.x - anchoBarra/2, this.y - 100, porcentajeVida, altoBarra);
+        let porcentaje = (this.vidaActual / this.vidaTotal) * 120;
+        ctx.fillRect(xB, yB, porcentaje, 10);
         
-        // Borde blanco fino
+        // Borde (Sin usar strokeRect para evitar el bug del path anterior)
         ctx.strokeStyle = "white";
         ctx.lineWidth = 1;
-        ctx.strokeRect(this.x - anchoBarra/2, this.y - 100, anchoBarra, altoBarra);
+        ctx.strokeRect(xB, yB, 120, 10);
 
         ctx.restore();
     }
-}
+    }
 
         function manejarAccion() {
     if (modoJefe) {
@@ -871,6 +936,9 @@ class CartelMarca {
 }
 
         function iniciarPartida() {
+            if (loopID) {
+            cancelAnimationFrame(loopID);
+            }
             // 1. Música (con protección por si no existe el elemento)
             const musica = document.getElementById('musica-fondo');
             if (musica) {
@@ -895,9 +963,8 @@ class CartelMarca {
             obstaculos = []; 
             poderes = []; 
             cartelesMarca = [];
-            
-            // --- NUEVO: RESETEO DE VEHÍCULOS ---
             vehiculos = []; 
+            postes = [];
 
             if (typeof particulasCaminar !== 'undefined') {
                 particulasCaminar = []; 
@@ -971,29 +1038,48 @@ class CartelMarca {
 }
 
         function gameOver() {
-            canvas.classList.add('shake-efecto');
-            juegoActivo = false;
-            setTimeout(() => {
-                canvas.classList.remove('shake-efecto');
-                pantallaInicio.classList.remove('oculto');
-                if (puntos >= UMBRAL) {
-                    pantallaInicio.innerHTML = `<h2 style="color: #db2777;">¡OBJETIVO LOGRADO! ✨</h2><p>Puntaje: ${puntos}</p><button class="btn-inicio" onclick="location.reload()">RECLAMAR PREMIO</button>`;
-                } else {
-                    pantallaInicio.innerHTML = `<h2 style="color: #6b7280;">¡Casi lo lográs! ☀️</h2><p>Puntaje: ${puntos}</p><button class="btn-inicio" onclick="iniciarPartida()">REINTENTAR</button><button onclick="location.reload()" style="background:none; border:none; color:#9ca3af; cursor:pointer; margin-top:10px;">INICIO</button>`;
-                }
-            }, 400);
-        }
+    canvas.classList.add('shake-efecto');
+    juegoActivo = false;
 
-        canvas.addEventListener('touchstart', (e) => { 
+    // --- PROTECCIÓN: Cancelamos el loop actual apenas muere ---
+    if (typeof loopID !== 'undefined' && loopID) {
+        cancelAnimationFrame(loopID);
+    }
+
+    setTimeout(() => {
+        canvas.classList.remove('shake-efecto');
+        pantallaInicio.classList.remove('oculto');
+        
+        if (puntos >= UMBRAL) {
+            pantallaInicio.innerHTML = `
+                <h2 style="color: #db2777;">¡OBJETIVO LOGRADO! ✨</h2>
+                <p>Puntaje: ${puntos}</p>
+                <button class="btn-inicio" onclick="location.reload()">RECLAMAR PREMIO</button>`;
+        } else {
+            pantallaInicio.innerHTML = `
+                <h2 style="color: #6b7280;">¡Casi lo lográs! ☀️</h2>
+                <p>Puntaje: ${puntos}</p>
+                <button class="btn-inicio" onclick="iniciarPartida()">REINTENTAR</button>
+                <button onclick="location.reload()" style="background:none; border:none; color:#9ca3af; cursor:pointer; margin-top:10px;">INICIO</button>`;
+        }
+    }, 400);
+}
+
+// --- EVENTOS CORREGIDOS ---
+
+canvas.addEventListener('touchstart', (e) => { 
     e.preventDefault(); 
     if(juegoActivo) manejarAccion(); 
 }, {passive: false});
-        window.addEventListener('keydown', (e) => { 
+
+window.addEventListener('keydown', (e) => { 
     if (e.code === 'Space') { 
         if (juegoActivo) {
-            manejarAccion(); // <-- Ella decide si saltar o disparar
+            manejarAccion(); 
         } else {
-            iniciarPartida(); 
+            if (!pantallaInicio.classList.contains('oculto')) {
+                iniciarPartida(); 
+            }
         }
     }
 });
