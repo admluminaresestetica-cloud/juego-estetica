@@ -869,7 +869,17 @@ class CartelMarca {
     dibujar() {
         ctx.save();
 
-        // --- 1. OJOS ROJOS (Dibujados primero para que el cuerpo tape restos) ---
+        // --- 1. CUERPO OSCURO ---
+        ctx.fillStyle = "#1e293b"; 
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 50, 0, Math.PI * 2); 
+        ctx.arc(this.x - 50, this.y + 10, 45, 0, Math.PI * 2);
+        ctx.arc(this.x + 50, this.y + 10, 45, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y - 40, 40, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.closePath(); // <--- SEGURO 1
+
+        // --- 2. OJOS ROJOS ---
         ctx.fillStyle = "#ff0000";
         
         // Ojo Izquierdo
@@ -878,6 +888,7 @@ class CartelMarca {
         ctx.lineTo(this.x - 15, this.y - 5);
         ctx.lineTo(this.x - 50, this.y + 5);
         ctx.fill();
+        ctx.closePath(); // <--- SEGURO 2
 
         // Ojo Derecho
         ctx.beginPath();
@@ -885,33 +896,28 @@ class CartelMarca {
         ctx.lineTo(this.x + 15, this.y - 5);
         ctx.lineTo(this.x + 50, this.y + 5);
         ctx.fill();
+        ctx.closePath(); // <--- SEGURO 3
 
-        // --- 2. CUERPO OSCURO (Tapamos cualquier línea que haya quedado de los ojos) ---
-        ctx.fillStyle = "#1e293b"; 
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 50, 0, Math.PI * 2); 
-        ctx.arc(this.x - 50, this.y + 10, 45, 0, Math.PI * 2);
-        ctx.arc(this.x + 50, this.y + 10, 45, 0, Math.PI * 2);
-        ctx.arc(this.x, this.y - 40, 40, 0, Math.PI * 2);
-        ctx.fill();
-
-        // --- 3. BARRA DE VIDA (Usando solo rectángulos directos) ---
-        const xB = this.x - 60;
+        // --- 3. BARRA DE VIDA ---
+        const anchoBarra = 120;
+        const altoBarra = 10;
+        const xB = this.x - anchoBarra/2;
         const yB = this.y - 100;
 
-        // Fondo
+        // Fondo y Vida (Usamos rect directamente que no ensucia el path)
         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-        ctx.fillRect(xB, yB, 120, 10);
+        ctx.fillRect(xB, yB, anchoBarra, altoBarra);
         
-        // Vida
         ctx.fillStyle = "#ff4444";
-        let porcentaje = (this.vidaActual / this.vidaTotal) * 120;
-        ctx.fillRect(xB, yB, porcentaje, 10);
+        let porcentajeVida = (this.vidaActual / this.vidaTotal) * anchoBarra;
+        ctx.fillRect(xB, yB, porcentajeVida, altoBarra);
         
-        // Borde (Sin usar strokeRect para evitar el bug del path anterior)
+        // Borde blanco (Empezamos de cero absoluto)
+        ctx.beginPath();
         ctx.strokeStyle = "white";
         ctx.lineWidth = 1;
-        ctx.strokeRect(xB, yB, 120, 10);
+        ctx.strokeRect(xB, yB, anchoBarra, altoBarra);
+        ctx.closePath(); // <--- SEGURO 4
 
         ctx.restore();
     }
