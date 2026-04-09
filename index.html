@@ -849,80 +849,67 @@ class CartelMarca {
             }
         }
         
-       class Jefe {
-    constructor() {
-        this.x = canvas.width + 150; 
-        this.y = 150; 
-        this.w = 160; 
-        this.h = 100; 
-        this.vidaTotal = 15; 
-        this.vidaActual = 15;
-    }
-
-    actualizar() {
-        if (this.x > canvas.width - 150) {
-            this.x -= 2;
-        }
-        this.y = 150 + Math.sin(frames * 0.05) * 20;
-    }
-
-    dibujar() {
+       dibujar() {
         ctx.save();
 
-        // --- 1. CUERPO OSCURO ---
-        ctx.fillStyle = "#1e293b"; 
-        ctx.beginPath();
+        // --- 1. CUERPO OSCURO (Nube de Tormenta) ---
+        ctx.fillStyle = "#1e293b"; // Gris azulado oscuro
+        ctx.beginPath(); // <--- Empezamos a dibujar
         ctx.arc(this.x, this.y, 50, 0, Math.PI * 2); 
         ctx.arc(this.x - 50, this.y + 10, 45, 0, Math.PI * 2);
         ctx.arc(this.x + 50, this.y + 10, 45, 0, Math.PI * 2);
         ctx.arc(this.x, this.y - 40, 40, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.closePath(); // <--- SEGURO 1
+        ctx.fill(); 
+        ctx.closePath(); // <--- CERRAMOS EL CUERPO (Seguridad)
 
-        // --- 2. OJOS ROJOS ---
-        ctx.fillStyle = "#ff0000";
+        // --- 2. OJOS ROJOS AGRESIVOS (Dibujados ENCIMA del cuerpo) ---
+        // ¡ESTE ES EL CAMBIO CLAVE!
+        // Antes de dibujar los ojos, le decimos al navegador "olvida todo lo anterior"
+        ctx.beginPath(); 
+
+        ctx.fillStyle = "#ff0000"; // Rojo puro
         
         // Ojo Izquierdo
-        ctx.beginPath();
+        // No empezamos con moveTo para evitar arrastrar líneas de la nube
         ctx.moveTo(this.x - 50, this.y - 20);
         ctx.lineTo(this.x - 15, this.y - 5);
         ctx.lineTo(this.x - 50, this.y + 5);
         ctx.fill();
-        ctx.closePath(); // <--- SEGURO 2
+        ctx.closePath(); // <--- CERRAMOS EL OJO IZQUIERDO
 
         // Ojo Derecho
-        ctx.beginPath();
+        ctx.beginPath(); // <--- NUEVO PINCELES PARA EL OJO DERECHO
         ctx.moveTo(this.x + 50, this.y - 20);
         ctx.lineTo(this.x + 15, this.y - 5);
         ctx.lineTo(this.x + 50, this.y + 5);
         ctx.fill();
-        ctx.closePath(); // <--- SEGURO 3
+        ctx.closePath(); // <--- CERRAMOS EL OJO DERECHO
 
-        // --- 3. BARRA DE VIDA ---
+        // --- 3. BARRA DE VIDA SOBRE EL JEFE ---
+        // Usamos rectángulos directos (fillRect) que no ensucian el path actual
         const anchoBarra = 120;
         const altoBarra = 10;
-        const xB = this.x - anchoBarra/2;
-        const yB = this.y - 100;
+        const xBarra = this.x - 60;
+        const yBarra = this.y - 100;
 
-        // Fondo y Vida (Usamos rect directamente que no ensucia el path)
+        // Fondo (negro transparente)
         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-        ctx.fillRect(xB, yB, anchoBarra, altoBarra);
+        ctx.fillRect(xBarra, yBarra, anchoBarra, altoBarra);
         
+        // Vida (rojo brillante)
         ctx.fillStyle = "#ff4444";
         let porcentajeVida = (this.vidaActual / this.vidaTotal) * anchoBarra;
-        ctx.fillRect(xB, yB, porcentajeVida, altoBarra);
+        ctx.fillRect(xBarra, yBarra, porcentajeVida, altoBarra);
         
-        // Borde blanco (Empezamos de cero absoluto)
+        // Borde (blanco, con su propio BeginPath para no conectarse)
         ctx.beginPath();
         ctx.strokeStyle = "white";
         ctx.lineWidth = 1;
-        ctx.strokeRect(xB, yB, anchoBarra, altoBarra);
-        ctx.closePath(); // <--- SEGURO 4
+        ctx.strokeRect(xBarra, yBarra, anchoBarra, altoBarra);
+        ctx.closePath(); // <--- CERRAMOS EL BORDE
 
         ctx.restore();
     }
-    }
-
         function manejarAccion() {
     if (modoJefe) {
         // --- EN MODO JEFE HACE LAS DOS COSAS ---
